@@ -1,2 +1,2 @@
 # python
-my python progect
+my python project
