@@ -1,10 +1,26 @@
 # this is a check configure list file
-product_name=as5712
-part_number=abc
-serial_number=12345
-mac_address=00:8c:fb:20:20:22
-device_version=2.7.1
-platform_name=as5712
-onie_version=tao-201503252258-dirty
-vendor_name=accton
-cpldX_version=2.7.1
+
+##### hwinfo information
+/sys/class/swmon/hwinfo
+product_name
+part_number
+serial_number
+mac_address
+device_version
+platform_name
+onie_version
+vendor_name
+cpld1_version
+cpld2_version
+
+##### psu information
+/sys/class/swmon/psu
+power_good
+present
+power_alarm
+serial_number
+
+##### ports information
+/sys/class/swmon/port
+plugged_in
+identifier
