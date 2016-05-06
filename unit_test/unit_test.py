@@ -14,12 +14,13 @@ This is a kernel sysfs unit test script
 import os
 import os.path
 
-log_name = 'check_log'
+log_file = 'check_log'
+config_file = 'config'
 
 #init log file
 def init_log():
     try:
-        log = open(log_name, 'w')
+        log = open(log_file, 'w')
         log.truncate()      #empty log file
     except IOError:
         print "open log file failed"
@@ -29,18 +30,19 @@ def init_log():
 #write log file
 def write_log(info, num = -1):
     try:
-        log = open(log_name, 'a')
-        if num == 0:
+        log = open(log_file, 'a')
+        if num == 0:        #sysfs path is not exist
             log.write("[failed]" + info + " is not exist"  + "\n")
             print ("[failed] " + info + " is not exist")
-        if num == 1:
+        if num == 1:        #open file success, and record file content
             log.write("[pass]" + info + "\n")
             print ("[pass] " + info)
-        if num == 2:
+        if num == 2:        #open file failed, or empty file
             log.write("[failed]" + info + "\n")
             print ("[failed] " + info)
-        if num == -1:
+        if num == -1:       #print check unit name
             log.write(info + "\n")
+            print info
     except IOError:
         print "open log file failed"
         os._exit(-1)
@@ -65,87 +67,63 @@ def read_info(file_path):
         tmp = ''.join([file_name,'=',tmp])
         return tmp, 1
     except IOError:
-        tmp = ''.join([file_name, ' open failed'])
-        return tmp, 2
+        #tmp = ''.join([file_name, ' open failed'])
+        return file_name, 2
 
-
-#path_name = '/sys/class/swmon/hwinfo'
 #path_name_test = '/sys/class/hwmon/hwmon0'
 
 #split config file
-def check_config():
-    with open('config', 'r') as f:
-        flag = 1
-        unit_name = ''
-        path_name = ''
+def config_split():
+    with open(config_file, 'r') as f:
         config_tab = f.readlines()
-        for line in config_tab:
-            line = line.strip()
-            if flag == 1 and line.split(' ')[0] == '#####':
-                unit_name = line
-                print unit_name
-                flag = 0
+        check_list = []
+        arr = []
+        for i,tmp in enumerate(config_tab):
+            if tmp == '\n':
+                arr.append(i)
+        if len(config_tab)-1 not in arr:
+            arr.append(len(config_tab)-1)
+        for i,tmp in enumerate(arr):
+            if tmp == arr[-1]:
                 continue
-            elif flag == 1:
-                continue
+            else:
+                a=config_tab[arr[i] + 1 : arr[i+1]]
+                check_list.append(a)
+    return  check_list              
 
-            if flag == 0:
-                dir_path = line
-                write_log(unit_name)
-                if os.path.exists(dir_path):
-                    flag = 2
-                    continue
-                else:
-                    write_log(dir_path, 0)
-                    flag = 1
-                    continue
 
-            if flag == 2:
-                if line == '' or line == '\n':
-                    flag = 1
-                    print '\n'
-                    write_log('')
-                    continue
-                else:
-                    file_path = os.path.join(dir_path, line)
-                    info = read_info(file_path)
-                    write_log(info[0], info[1])
+def check_config(check_list):
+    for tmp in check_list:
+        if 'hwinfo' in tmp[0]:
+            check_hwinfo(tmp)
+        if 'psu' in tmp[0]:
+            pass
+            #check_psu(tmp)
+        if 'ports' in tmp[0]:
+            pass
+            #check_ports()
     return
 
-'''
-                split_count[j] = i + 1
-                j = j + 1
-        split_count[j] = i
-   return split_count
-
-        else:
-            flag = 0
-            check_list = line.strip().split('=')
-        tmp = os.path.join(path_name, check_list[0])
-        try:
-            f1 = open(tmp, 'r')
-            if check_list[1] == f1.read().strip():
-                print "%-20s     pass" %check_list[0]
-                log.write("[pass]" + check_list[0] + "\n")
-            else:
-                log.write(check_list[0] + '\t' + "failed" + '\t')
-        except IOError:
-                print "%-20s     failed" %check_list[0]
-                log.write("[failed]" + check_list[0] + "\n")
-        #finally:
-            #if f1:
-             #   f1.close()
-       # print(tmp)
-    retrun
-'''
-
-#check hwinfo information
-#def check_hwinfo():
-
+#check hwinfo 
+def check_hwinfo(check_list):
+    unit_name = check_list[0].strip()
+    write_log(unit_name)
+    dir_path = check_list[1].strip()
+    if os.path.exists(dir_path) == False:
+        write_log(dir_path, 0)
+        return
+    for tmp in check_list[2:]:
+        tmp = tmp.strip()
+        file_path = os.path.join(dir_path, tmp)
+        info = read_info(file_path)
+        write_log(info[0], info[1])
+    write_log('')
+    return
 
 
 if __name__=="__main__":
     init_log()
-    check_config()
+    check_list = config_split()
+    check_config(check_list)
 
 
