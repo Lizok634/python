@@ -1,4 +1,6 @@
 # this is a check configure list file
+# creat time : 2016.5.3
+# modify time : 
 
 ##### hwinfo information
 /sys/class/swmon/hwinfo
@@ -15,13 +17,81 @@ cpld2_version
 
 ##### psu information
 /sys/class/swmon/psu
-power_good
 present
+power_good
 power_alarm
 serial_number
+model_name
+tempX_input -12800-127996
+fanX_input
+fanX_pwm 0-255
+fanX_fault
 
-##### ports information
-/sys/class/swmon/port
+##### sfp/sfp+ ports information
+/sys/class/swmon/portX
 plugged_in
 identifier
+connector_type
+transceiver_code
+length_smf
+length_sm
+length_om1
+length_om2
+length_om3
+length_om4
+vendor_name
+vendor_pn
+wavelength
+vendor_sn
+update_enable
+temperature
+supply_voltage
+bias_current
+tx_power
+rx_power
+
+##### qsfp ports information
+/sys/class/swmon/portX
+plugged_in
+identifier
+ext_identifier
+connector_type
+transceiver_code
+length_smf
+length_om1
+length_om2
+length_om3
+length_om4
+vendor_name
+vendor_pn
+wavelength
+vendor_sn
+update_enable
+temperature
+supply_voltage
+rx1_power
+rx2_power
+rx3_power
+rx4_power
+tx1_bias_current
+tx2_bias_current
+tx3_bias_current
+tx4_bias_current
+
+##### ctrl ports information
+/sys/class/swmon/ctrl
+fan_number
+fanr_number
+fan_direction
+fanX_input
+fanrX_input
+fanX_pwm
+fanX_fault
+fanrX_fault
+cpu_temp_input
+switch_temp_input
+board_temp_input
+phy_reset
+led_reset
+start_mode
 

@@ -13,6 +13,7 @@ This is a kernel sysfs unit test script
 
 import os
 import os.path
+import datetime
 
 log_file = 'check_log'
 config_file = 'config'
@@ -22,6 +23,20 @@ def init_log():
     try:
         log = open(log_file, 'w')
         log.truncate()      #empty log file
+        tmp = os.popen('version')   #get box name
+        boxinfo = tmp.readlines();tmp.close()
+        box = boxinfo[2].split(':')[1].strip()
+        box = ''.join(['Box:', box])
+        version = boxinfo[3].split(':')[1].strip()  #get system version
+        version = ''.join(['version', ':', version])
+        ip = os.popen('ifconfig | grep 10.10.51.')  #get box ip address
+        addr = ip.read();ip.close();addr = addr.split(' ')
+        ip = ''.join([x for x in addr if 'addr' in x])
+        time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        time = ''.join(['time:', time])   #get current time
+        info = ''.join(['# ', box, '  ', version, '  ', ip, '  ', time])
+        write_log(info)
+        write_log('')
     except IOError:
         print "open log file failed"
         os._exit(-1)
@@ -62,10 +77,10 @@ def read_info(file_path):
     file_name = os.path.basename(file_path)
     try:
         f = open(file_path, 'r')
-        tmp = f.readline().splitlines()
-        tmp = ''.join(tmp)
+        value = f.readline().splitlines()
+        tmp = ''.join(value)
         tmp = ''.join([file_name,'=',tmp])
-        return tmp, 1
+        return tmp, 1, value
     except IOError:
         #tmp = ''.join([file_name, ' open failed'])
         return file_name, 2
@@ -93,15 +108,25 @@ def config_split():
 
 
 def check_config(check_list):
-    for tmp in check_list:
-        if 'hwinfo' in tmp[0]:
-            check_hwinfo(tmp)
-        if 'psu' in tmp[0]:
-            pass
-            #check_psu(tmp)
-        if 'ports' in tmp[0]:
-            pass
-            #check_ports()
+    for sys_path in check_list:
+        if 'hwinfo' in sys_path[0]:
+            check_hwinfo(sys_path)
+            continue
+        if 'psu' in sys_path[0]:
+            check_psu(sys_path)
+            continue
+        if 'port' in sys_path[0]:
+            check_ports(sys_path)
+            continue
+        if 'ctrl' in sys_path[0]:
+            check_ctrl(sys_path)
+            continue
+        if 'leds' in sys_path[0]:
+            check_leds(sys_path)
+            contine
+        if 'watchdog' in sys_path[0]:
+            check_watchdog(sys_path)
+            continue
     return
 
 #check hwinfo 
@@ -111,19 +136,89 @@ def check_hwinfo(check_list):
     dir_path = check_list[1].strip()
     if os.path.exists(dir_path) == False:
         write_log(dir_path, 0)
+        write_log('')
         return
-    for tmp in check_list[2:]:
-        tmp = tmp.strip()
-        file_path = os.path.join(dir_path, tmp)
+    for attr in check_list[2:]:
+        attr = attr.strip()
+        file_path = os.path.join(dir_path, attr)
         info = read_info(file_path)
         write_log(info[0], info[1])
     write_log('')
     return
 
+#check psu
+def check_psu(check_list):
+    unit_name = check_list[0].strip()   #print unit test name
+    write_log(unit_name)
+    dir_path = check_list[1].strip()    #get unit test path
+    if os.path.exists(dir_path) == False:   #check path exist or not
+        write_log(dir_path, 0)
+        write_log('')
+        return
+    psu_num = os.listdir(ditpath)
+    for psu in psu_num:
+        X = psu.replace('psu', '')  #get psu num
+        psu_path = os.path.join(dir_path, psu_num)  #
+        for attr in check_list[2:]:
+            attr = attr.strip()
+            if 'X' in attr:
+                attr = attr.replace('X',X)
+            file_path = os.path.join(dir_path, attr)
+            info = read_info(file_path)
+            if attr == 'present' and info[2] == '0':
+                info[0] == psu.join(' is not present')    
+                write_log(info[0])
+            else:
+                write_log(info[0], info[1])
+    write_log('')
+    return
+
+#check ports
+def check_ports(check_list):
+    return
+
+
+#check ctrl
+def check_ctrl(check_list):
+    return
+
+#check watchdog
+def check_watchdog(check_list):
+    unit_name = check_list[0].strip()   #print unit test name
+    write_log(unit_name)
+    dir_path = check_list[1].strip()    #get unit test path
+    if os.path.exists(dir_path) == False:   #check path exist or not
+        write_log(dir_path, 0)
+        write_log('')
+        return
+    attr = check_list[2].strip()
+    file_path = os.path.join(dir_path, attr)
+    info = read_info(file_path)
+    if info[2] == '1':
+        info[0] == psu.join(' enable')    
+        write_log(info[0])
+    elif info[2] == '0':
+        info[0] == psu.join(' disable')
+        write_log(info[0], 2)
+    else:
+        write_log(info[0], info[1])
+    write_log('')
+    return
+
+
+
+
+
+
+
+
+
+
+
 
 if __name__=="__main__":
     init_log()
-    check_list = config_split()
-    check_config(check_list)
+    #check_list = config_split()
+    #check_config(check_list)
 
 
