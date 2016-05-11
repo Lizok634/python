@@ -22,9 +22,9 @@ power_good
 power_alarm
 serial_number
 model_name
-tempX_input -12800-127996
+tempX_input
 fanX_input
-fanX_pwm 0-255
+fanX_pwm
 fanX_fault
 
 ##### sfp/sfp+ ports information
@@ -78,20 +78,34 @@ tx2_bias_current
 tx3_bias_current
 tx4_bias_current
 
-##### ctrl ports information
+##### ctrl information
 /sys/class/swmon/ctrl
 fan_number
 fanr_number
 fan_direction
-fanX_input
-fanrX_input
-fanX_pwm
-fanX_fault
-fanrX_fault
 cpu_temp_input
 switch_temp_input
 board_temp_input
 phy_reset
 led_reset
 start_mode
+fanX_input
+fanrX_input
+fanX_pwm
+fanX_fault
+fanrX_fault
+
+##### leds information
+/sys/class/leds
+psuX_led/brightness
+fan_led/brightness
+diag_led/brightness
+loc_Led/brightness
+
+##### watchdog information
+/sys/class/watchdog/watchdog0
+wdt_enable
+keep_alive
+time_left
+timeout
 
