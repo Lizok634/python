@@ -14,6 +14,7 @@ onie_version
 vendor_name
 cpld1_version
 cpld2_version
+cpld3_version
 
 ##### psu information
 /sys/class/swmon/psu
@@ -28,7 +29,7 @@ fanX_pwm
 fanX_fault
 
 ##### sfp/sfp+ ports information
-/sys/class/swmon/portX
+/sys/class/swmon/ports
 plugged_in
 identifier
 connector_type
@@ -51,7 +52,7 @@ tx_power
 rx_power
 
 ##### qsfp ports information
-/sys/class/swmon/portX
+/sys/class/swmon/ports
 plugged_in
 identifier
 ext_identifier

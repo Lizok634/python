@@ -47,16 +47,16 @@ def write_log(info, num = -1):
     try:
         log = open(log_file, 'a')
         if num == 0:        #sysfs path is not exist
-            log.write("[failed]" + info + " is not exist"  + "\n")
-            print ("[failed] " + info + " is not exist")
+            log.write('[failed]' + info + ' is not exist'  + '\n')
+            print ('[failed] ' + info + " is not exist")
         if num == 1:        #open file success, and record file content
-            log.write("[pass]" + info + "\n")
-            print ("[pass] " + info)
+            log.write('[ pass ]' + '\t'  + info + '\n')
+            print ('[ pass ] ' + '\t' + info)
         if num == 2:        #open file failed, or empty file
-            log.write("[failed]" + info + "\n")
-            print ("[failed] " + info)
+            log.write('[failed]' + '\t' + info + '\n')
+            print ('[failed] ' + '\t'  + info)
         if num == -1:       #print info without prefix
-            log.write(info + "\n")
+            log.write(info + '\n')
             print info
     except IOError:
         print "open log file failed"
@@ -79,7 +79,7 @@ def read_info(file_path):
         f = open(file_path, 'r')
         value = f.readline().splitlines()
         value = ''.join(value)
-        tmp = ''.join([file_name,'=',value])
+        tmp = ''.join([file_name,'\t',value])
         f.close()
         return tmp, 1, value
     except IOError:
@@ -105,16 +105,17 @@ def config_split():
                 check_list.append(a)
     return  check_list              
 
-def check_config(check_list):
+#check sysfs
+def check_sysfs(check_list):
     for sys_path in check_list:
         if 'hwinfo' in sys_path[0]:     #hwinfo
             check_hwinfo(sys_path)
         elif 'psu' in sys_path[0]:      #psu
             check_psu(sys_path)
-        elif 'sfp' in sys_path[0]:      #sfp
-            check_sfp(sys_path)
+        elif 'sfp/sfp+' in sys_path[0]: #sfp
+            check_Xsfp(sys_path, 'sfp')
         elif 'qsfp' in sys_path[0]:     #qsfp
-            check_qsfp(sys_path)
+            check_Xsfp(sys_path, 'qsfp')
         elif 'ctrl' in sys_path[0]:     #ctrl
             check_ctrl(sys_path)
         elif 'leds' in sys_path[0]:     #leds
@@ -155,27 +156,29 @@ def check_psu(check_list):
         psu_path = os.path.join(dir_path, psu)  #joint psu path
         tip = ''.join(['#********', psu, '********#'])
         write_log(tip)
-        attrX = [''.join(x) for x in os.listdir(psu_path) if 'fan' in x or 'temp' in x]
-        for x in sorted(attrX):
-            check_list.append(x)
+        attrX = [''.join(x) for x in os.listdir(psu_path) \
+                            if 'fan' in x or 'temp' in x]
+        #for x in sorted(attrX):
+        #    check_list.append(x)
+        check_list.extend(attrX)
 
         for attr in check_list[2:]:
             attr = attr.strip()
-            if 'X' in attr:
+            if 'X' in attr:         #ignore contain X attr
                 continue
             file_path = os.path.join(psu_path, attr)
             info = read_info(file_path)
             if 'present' in attr and info[2] == '0':
-                tmp = ''.join([psu, ' is not present'])    
-                write_log(tmp)
+                log = ''.join([psu, ' is not present'])    
+                write_log(log)
                 break
             else:
                 write_log(info[0], info[1])
     write_log('')
     return
 
-#check ports sfp
-def check_sfp(check_list):
+#check ports sfp or qsfp
+def check_Xsfp(check_list, modu_name):
     unit_name = check_list[0].strip()   #print unit test name
     write_log(unit_name)
     dir_path = check_list[1].strip()    #get unit test path
@@ -183,10 +186,28 @@ def check_sfp(check_list):
         write_log(dir_path, 0)
         write_log('')
         return
-    return
-
-#check ports qsfp
-def check_qsfp(check_list):
+    portX = os.listdir(dir_path)
+    for port in portX:
+        file_path = os.path.join(dir_path, port, 'name')    #check ports type 
+        info = read_info(file_path) 
+        if info[2] == modu_name:
+            tip = ''.join(['#********', port, '********#'])
+            write_log(tip)
+            attr = check_list[2].strip()    #check module plug in or out
+            file_path = os.path.join(dir_path, port, attr)
+            info = read_info(file_path) 
+            if info[2] == '0':
+                log = ''.join([modu_name,' plug out'])
+                write_log(log)
+            else:
+                for attr in check_list[2:]:
+                    attr = attr.strip()
+                    file_path = os.path.join(dir_path, port, attr)
+                    info = read_info(file_path)
+                    write_log(info[0], info[1])
+        else:
+            continue
+    write_log('')
     return
 
 #check ctrl
@@ -207,7 +228,7 @@ def check_ctrl(check_list):
     info = read_info(file_path)
     if info[2].isdigit() and int(info[2]) < 20:
         fan_number = info[2]
-        attr = attr.join(['=',fan_number])
+        attr = ''.join([attr, '=',fan_number])
         write_log(attr, 1)
     else:
         write_log(attr, 2)
@@ -218,7 +239,7 @@ def check_ctrl(check_list):
     info = read_info(file_path)
     if info[2].isdigit() and int(info[2]) < 20:
         fanr_number = info[2]
-        attr = attr.join(['=',fanr_number])
+        attr = ''.join([attr, '=',fanr_number])
         write_log(attr, 1)
     else:
         write_log(attr, 2)
@@ -228,17 +249,17 @@ def check_ctrl(check_list):
         attr = attr.strip()
         if 'fanX' in attr:  #get fanX info
             n = 1
-            while n <= fan_number:
-                attr = attr.replace('X',n)
-                file_path = os.path.join(dir_path, attr)
+            while n <= int(fan_number):
+                attrX = attr.replace('X',str(n))
+                file_path = os.path.join(dir_path, attrX)
                 info = read_info(file_path)
                 write_log(info[0], info[1])
                 n += 1
         elif 'fanrX' in attr:   #get fanrX info
             n = 1
-            while n <= fanr_number:
-                attr = attr.replace('X',n)
-                file_path = os.path.join(dir_path, attr)
+            while n <= int(fanr_number):
+                attrX = attr.replace('X',str(n))
+                file_path = os.path.join(dir_path, attrX)
                 info = read_info(file_path)
                 write_log(info[0], info[1])
                 n += 1
@@ -258,11 +279,13 @@ def check_leds(check_list):
         write_log(dir_path, 0)
         write_log('')
         return
-    attrX = [''.join([x, '/brightness']) for x in os.listdir(dir_path) if 'psu' in x]
+    attrX = [''.join([x, '/brightness'])    \
+                for x in os.listdir(dir_path) if 'psu' in x]
     if 'psuX_led/brightness' in check_list:
         check_list.remove('psuX_led/brightness')
-        for attr in attrX:
-            check_list.append(arrt)
+        #for attr in attrX:
+        #    check_list.append(arrt)
+        check_list.extend(arrtX)
     for attr in check_list[2:]:
         attr = attr.strip()
         file_path = os.path.join(dir_path, attr)
@@ -283,31 +306,22 @@ def check_watchdog(check_list):
     attr = check_list[2].strip()
     file_path = os.path.join(dir_path, attr)
     info = read_info(file_path)
-    if info[2] == '1':
-        info[0] == psu.join(' enable')    
-        write_log(info[0])
-    elif info[2] == '0':
-        info[0] == psu.join(' disable')
-        write_log(info[0], 2)
+    
+    if int(info[2]) == 1:
+        tmp = ''.join([attr, ' is enable'])    
+        write_log(tmp)
+    elif int(info[2]) == 0:
+        tmp = ''.join([attr,' is disable'])
+        write_log(tmp, 2)
     else:
         write_log(info[0], info[1])
     write_log('')
     return
 
 
-
-
-
-
-
-
-
-
-
-
 if __name__=="__main__":
     init_log()
     check_list = config_split()
-    check_config(check_list)
+    check_sysfs(check_list)
 
 
