@@ -114,9 +114,9 @@ def check_sysfs(check_list):
         elif 'psu' in sys_path[0]:      #psu
             check_psu(sys_path)
         elif 'sfp/sfp+' in sys_path[0]: #sfp
-            check_Xsfp(sys_path, 'sfp')
+            check_Xsfp(sys_path, '3')
         elif 'qsfp' in sys_path[0]:     #qsfp
-            check_Xsfp(sys_path, 'qsfp')
+            check_Xsfp(sys_path, '4')
         elif 'ctrl' in sys_path[0]:     #ctrl
             check_ctrl(sys_path)
         elif 'leds' in sys_path[0]:     #leds
@@ -181,7 +181,7 @@ def check_psu(check_list):
     return
 
 #check ports sfp or qsfp
-def check_Xsfp(check_list, modu_name):
+def check_Xsfp(check_list, modu_type):
     unit_name = check_list[0].strip()   #print unit test name
     write_log(unit_name)
     dir_path = check_list[1].strip()    #get unit test path
@@ -191,9 +191,12 @@ def check_Xsfp(check_list, modu_name):
         return
     portX = os.listdir(dir_path)
     for port in portX:
-        file_path = os.path.join(dir_path, port, 'name')    #check ports type 
+        file_path = os.path.join(dir_path, port, 'identifier')    #check ports type 
         info = read_info(file_path) 
-        if info[2] == modu_name:
+        modu_id = info[2]
+        if modu_id != '3':
+            modu_id = '4'
+        if modu_id == modu_type:
             tip = ''.join(['#********', port, '********#'])
             write_log(tip)
             write_log('{0:<12}{1:<20}{2:<15}'.format('status', 'attribute', 'key'))
@@ -201,14 +204,16 @@ def check_Xsfp(check_list, modu_name):
             file_path = os.path.join(dir_path, port, attr)
             info = read_info(file_path) 
             if info[2] == '0':
-                log = ''.join([modu_name,' plug out'])
+                log = ''.join(['module plug out'])
                 write_log(log)
+                write_log('')
             else:
                 for attr in check_list[2:]:
                     attr = attr.strip()
                     file_path = os.path.join(dir_path, port, attr)
                     info = read_info(file_path)
                     write_log(info[0], info[1])
+                write_log('')
         else:
             continue
     write_log('')
