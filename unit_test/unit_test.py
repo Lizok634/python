@@ -34,7 +34,7 @@ def init_log():
         ip = ''.join([x for x in addr if 'addr' in x])
         time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         time = ''.join(['time:', time])   #get current time
-        info = ''.join(['# ', box, '  ', version, '  ', ip, '  ', time])
+        info = ''.join(['# ', box, '  ', version, '\n# ', ip, '  ', time])
         write_log(info)
         write_log('')
     except IOError:
@@ -47,14 +47,15 @@ def write_log(info, num = -1):
     try:
         log = open(log_file, 'a')
         if num == 0:        #sysfs path is not exist
-            log.write('[failed]' + info + ' is not exist'  + '\n')
-            print ('[failed] ' + info + " is not exist")
+            log.write('{0:<12}{1}{2}'.format('[failed]',\
+                        info, ' is not exist', '\n'))
+            print '{0:<12}{1}'.format('[failed]', info,' is not exist')
         if num == 1:        #open file success, and record file content
-            log.write('[ pass ]' + '\t'  + info + '\n')
-            print ('[ pass ] ' + '\t' + info)
+            log.write('{0:<12}{1}{2}'.format('[ pass ]', info, '\n'))
+            print '{0:<12}{1}'.format('[ pass ]', info)
         if num == 2:        #open file failed, or empty file
-            log.write('[failed]' + '\t' + info + '\n')
-            print ('[failed] ' + '\t'  + info)
+            log.write('{0:<12}{1}{2}'.format('[failed]', info, '\n'))
+            print '{0:<12}{1}'.format('[failed]', info)
         if num == -1:       #print info without prefix
             log.write(info + '\n')
             print info
@@ -79,7 +80,7 @@ def read_info(file_path):
         f = open(file_path, 'r')
         value = f.readline().splitlines()
         value = ''.join(value)
-        tmp = ''.join([file_name,'\t',value])
+        tmp = '{0:<20}{1:<25}'.format(file_name, value)
         f.close()
         return tmp, 1, value
     except IOError:
@@ -133,6 +134,7 @@ def check_hwinfo(check_list):
         write_log(dir_path, 0)
         write_log('')
         return
+    write_log('{0:<12}{1:<20}{2:<15}'.format('status', 'attribute', 'key'))
     for attr in check_list[2:]:
         attr = attr.strip()
         file_path = os.path.join(dir_path, attr)
@@ -150,6 +152,7 @@ def check_psu(check_list):
         write_log(dir_path, 0)
         write_log('')
         return
+    write_log('{0:<12}{1:<20}{2:<15}'.format('status', 'attribute', 'key'))
     psu_num = os.listdir(dir_path)
     for psu in psu_num:
         X = psu.replace('psu', '')  #get psu num
@@ -193,6 +196,7 @@ def check_Xsfp(check_list, modu_name):
         if info[2] == modu_name:
             tip = ''.join(['#********', port, '********#'])
             write_log(tip)
+            write_log('{0:<12}{1:<20}{2:<15}'.format('status', 'attribute', 'key'))
             attr = check_list[2].strip()    #check module plug in or out
             file_path = os.path.join(dir_path, port, attr)
             info = read_info(file_path) 
@@ -223,6 +227,7 @@ def check_ctrl(check_list):
     fan_number = 0
     fanr_number = 0
 
+    write_log('{0:<12}{1:<20}{2:<15}'.format('status', 'attribute', 'key'))
     attr = check_list[2].strip()    #get fan number
     file_path = os.path.join(dir_path, attr)
     info = read_info(file_path)
@@ -279,6 +284,7 @@ def check_leds(check_list):
         write_log(dir_path, 0)
         write_log('')
         return
+    write_log('{0:<12}{1:<20}{2:<15}'.format('status', 'attribute', 'key'))
     attrX = [''.join([x, '/brightness'])    \
                 for x in os.listdir(dir_path) if 'psu' in x]
     if 'psuX_led/brightness' in check_list:
@@ -303,6 +309,7 @@ def check_watchdog(check_list):
         write_log(dir_path, 0)
         write_log('')
         return
+    write_log('{0:<12}{1:<20}{2:<15}'.format('status', 'attribute', 'key'))
     attr = check_list[2].strip()
     file_path = os.path.join(dir_path, attr)
     info = read_info(file_path)
@@ -318,7 +325,7 @@ def check_watchdog(check_list):
     write_log('')
     return
 
-
+#main function entry
 if __name__=="__main__":
     init_log()
     check_list = config_split()
