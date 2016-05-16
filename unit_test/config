@@ -87,8 +87,6 @@ fan_direction
 cpu_temp_input
 switch_temp_input
 board_temp_input
-phy_reset
-led_reset
 start_mode
 fanX_input
 fanrX_input
@@ -101,7 +99,7 @@ fanrX_fault
 psuX_led/brightness
 fan_led/brightness
 diag_led/brightness
-loc_Led/brightness
+loc_led/brightness
 
 ##### watchdog information
 /sys/class/watchdog/watchdog0

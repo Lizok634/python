@@ -13,6 +13,7 @@ This is a kernel sysfs unit test script
 
 import os
 import re
+import copy
 import os.path
 import datetime
 
@@ -51,6 +52,8 @@ def init_log():
 
 #write log file
 def write_log(attr, value = None, ret = -1):
+    if value == '':
+        ret = 2
     try:
         log = open(log_file, 'a')
         if ret == 0:        #open file success,  write info to the log file
@@ -62,8 +65,8 @@ def write_log(attr, value = None, ret = -1):
                         attr, ' is not exist\n'))
             print '{0:<12}{1}{2}'.format('[failed]', attr,' is not exist')
         if ret == 2:        #open file failed, an empty file
-            log.write('{0:<12}{1:<20}{2:<25}'.format('[failed]', attr, 'NULL\n'))
-            print '{0:<12}{1:<20}{2:<25}'.format('[failed]', info, 'NULL')
+            log.write('{0:<12}{1:<20}{2}'.format('[failed]', attr, 'NULL\n'))
+            print '{0:<12}{1:<20}{2}'.format('[failed]', attr, 'NULL')
         if ret == 3:        #error value
             log.write('{0:<12}{1:<20}{2:<25}{3}'.format('[failed]',\
                         attr, value, '\n'))
@@ -115,7 +118,7 @@ def config_split():
             else:
                 a=config_tab[arr[i] + 1 : arr[i+1]]
                 check_list.append(a)
-    return  check_list              
+    return  check_list
 
 #check sysfs
 def check_sysfs(check_list):
@@ -136,7 +139,7 @@ def check_sysfs(check_list):
             check_watchdog(sys_path)
     return
 
-#check hwinfo 
+#check hwinfo
 def check_hwinfo(check_list):
     unit_name = check_list[0].strip()
     write_log(unit_name)
@@ -163,27 +166,27 @@ def check_psu(check_list):
         write_log(dir_path, None, 1)
         write_log('')
         return
-    write_log('{0:<12}{1:<20}{2:<15}'.format('status', 'attribute', 'key'))
     psu_num = os.listdir(dir_path)
     for psu in psu_num:
         X = psu.replace('psu', '')  #get psu num
         psu_path = os.path.join(dir_path, psu)  #joint psu path
         tip = ''.join(['#********', psu, '********#'])
         write_log(tip)
+        write_log('{0:<12}{1:<20}{2:<15}'.format('status', 'attribute', 'key'))
         attrX = [''.join(x) for x in os.listdir(psu_path) \
                             if 'fan' in x or 'temp' in x]
-        #for x in sorted(attrX):
-        #    check_list.append(x)
-        check_list.extend(attrX)
+        attrX.sort()
+        tmp_list = copy.deepcopy(check_list)#copy check_list to tmp_list
+        tmp_list.extend(attrX)
 
-        for attr in check_list[2:]:
+        for attr in tmp_list[2:]:
             attr = attr.strip()
             if 'X' in attr:         #ignore contain X attr
                 continue
             file_path = os.path.join(psu_path, attr)
             info = read_info(file_path)
             if 'present' in attr and info[0] == '0':
-                log = ''.join([psu, ' is not present'])    
+                log = ''.join([psu, ' is not present'])
                 write_log(log)
                 break
             else:
@@ -202,22 +205,25 @@ def check_Xsfp(check_list, modu_type):
         return
     portX = os.listdir(dir_path)
     for port in portX:
-        file_path = os.path.join(dir_path, port, 'identifier')    #check ports type 
-        info = read_info(file_path) 
+        file_path = os.path.join(dir_path, port, 'identifier')    #check ports type
+        info = read_info(file_path)
         modu_id = info[0]
         if modu_id != '3':
             modu_id = '4'
         if modu_id == modu_type:
-            tip = ''.join(['#********', port, '********#'])
-            write_log(tip)
+            #tip = ''.join(['#********', port, '********#'])
+            #write_log(tip)
             attr = check_list[2].strip()    #check module plug in or out
             file_path = os.path.join(dir_path, port, attr)
-            info = read_info(file_path) 
+            info = read_info(file_path)
             if info[0] == '0':
-                log = ''.join(['     module plug out     '])
-                write_log(log)
-                write_log('')
+                #log = ''.join(['     module plug out     '])
+                #write_log(log)
+                #write_log('')
+                pass
             else:
+                tip = ''.join(['#********', port, '********#'])
+                write_log(tip)
                 write_log('{0:<12}{1:<20}{2:<15}'.format('status',\
                             'attribute', 'key'))
                 for attr in check_list[2:]:
@@ -225,7 +231,6 @@ def check_Xsfp(check_list, modu_type):
                     file_path = os.path.join(dir_path, port, attr)
                     info = read_info(file_path)
                     write_log(attr, info[0], info[1])
-                write_log('')
         else:
             continue
     write_log('')
@@ -304,8 +309,6 @@ def check_leds(check_list):
                 for x in os.listdir(dir_path) if 'psu' in x]
     if 'psuX_led/brightness\n' in check_list:
         check_list.remove('psuX_led/brightness\n')
-        #for attr in attrX:
-        #    check_list.append(arrt)
         check_list.extend(attrX)
     for attr in check_list[2:]:
         attr = attr.strip()
@@ -328,7 +331,7 @@ def check_watchdog(check_list):
     attr = check_list[2].strip()
     file_path = os.path.join(dir_path, attr)
     info = read_info(file_path)
-    
+
     if int(info[2]) == 1:
         write_log(attr, 'enable', 0)
     elif int(info[2]) == 0:
