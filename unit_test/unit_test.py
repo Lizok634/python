@@ -12,6 +12,7 @@ This is a kernel sysfs unit test script
 '''
 
 import os
+import re
 import os.path
 import datetime
 
@@ -29,9 +30,15 @@ def init_log():
         box = ''.join(['Box:', box])
         version = boxinfo[3].split(':')[1].strip()  #get system version
         version = ''.join(['version', ':', version])
-        ip = os.popen('ifconfig | grep 10.10.51.')  #get box ip address
-        addr = ip.read();ip.close();addr = addr.split(' ')
-        ip = ''.join([x for x in addr if 'addr' in x])
+
+       #ip = os.popen('ifconfig | grep 10.10.51.')  #get box ip address
+        #addr = ip.read();ip.close();addr = addr.split(' ')
+        #ip = ''.join([x for x in addr if 'addr' in x])
+        tmp = os.popen('ifconfig')  #get box ip address
+        ip = tmp.read();tmp.close()
+        ip = re.findall(r'addr:10.10.51.\w{1,3}', ip)
+        ip = ''.join(ip)
+
         time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         time = ''.join(['time:', time])   #get current time
         info = ''.join(['# ', box, '  ', version, '\n# ', ip, '  ', time])
@@ -43,22 +50,27 @@ def init_log():
     return
 
 #write log file
-def write_log(info, num = -1):
+def write_log(attr, value = None, ret = -1):
     try:
         log = open(log_file, 'a')
-        if num == 0:        #sysfs path is not exist
+        if ret == 0:        #open file success,  write info to the log file
+            log.write('{0:<12}{1:<20}{2:<25}{3}'.format('[ pass ]',\
+                        attr, value, '\n'))
+            print '{0:<12}{1:<20}{2:<25}'.format('[ pass ]', attr, value)
+        if ret == 1:        #sysfs path is not exist
             log.write('{0:<12}{1}{2}'.format('[failed]',\
-                        info, ' is not exist', '\n'))
-            print '{0:<12}{1}'.format('[failed]', info,' is not exist')
-        if num == 1:        #open file success, and record file content
-            log.write('{0:<12}{1}{2}'.format('[ pass ]', info, '\n'))
-            print '{0:<12}{1}'.format('[ pass ]', info)
-        if num == 2:        #open file failed, or empty file
-            log.write('{0:<12}{1}{2}'.format('[failed]', info, '\n'))
-            print '{0:<12}{1}'.format('[failed]', info)
-        if num == -1:       #print info without prefix
-            log.write(info + '\n')
-            print info
+                        attr, ' is not exist\n'))
+            print '{0:<12}{1}{2}'.format('[failed]', attr,' is not exist')
+        if ret == 2:        #open file failed, an empty file
+            log.write('{0:<12}{1:<20}{2:<25}'.format('[failed]', attr, 'NULL\n'))
+            print '{0:<12}{1:<20}{2:<25}'.format('[failed]', info, 'NULL')
+        if ret == 3:        #error value
+            log.write('{0:<12}{1:<20}{2:<25}{3}'.format('[failed]',\
+                        attr, value, '\n'))
+            print '{0:<12}{1:<20}{2:<25}'.format('[failed]', info, value)
+        if ret == -1:       #print info without prefix
+            log.write(attr + '\n')
+            print attr
     except IOError:
         print "open log file failed"
         os._exit(-1)
@@ -75,17 +87,16 @@ def path_check(path_name, log):
 
 #check info
 def read_info(file_path):
-    file_name = os.path.basename(file_path)
+    value = '0'
     try:
         f = open(file_path, 'r')
         value = f.readline().splitlines()
         value = ''.join(value)
-        tmp = '{0:<20}{1:<25}'.format(file_name, value)
         f.close()
-        return tmp, 1, value
+        return value, 0
     except IOError:
         #tmp = ''.join([file_name, ' open failed'])
-        return file_name, 2, '0'
+        return value, 1
 
 #split config file
 def config_split():
@@ -131,7 +142,7 @@ def check_hwinfo(check_list):
     write_log(unit_name)
     dir_path = check_list[1].strip()
     if os.path.exists(dir_path) == False:
-        write_log(dir_path, 0)
+        write_log(dir_path, None, 1)
         write_log('')
         return
     write_log('{0:<12}{1:<20}{2:<15}'.format('status', 'attribute', 'key'))
@@ -139,7 +150,7 @@ def check_hwinfo(check_list):
         attr = attr.strip()
         file_path = os.path.join(dir_path, attr)
         info = read_info(file_path)
-        write_log(info[0], info[1])
+        write_log(attr, info[0], info[1])
     write_log('')
     return
 
@@ -149,7 +160,7 @@ def check_psu(check_list):
     write_log(unit_name)
     dir_path = check_list[1].strip()    #get unit test path
     if os.path.exists(dir_path) == False:   #check path exist or not
-        write_log(dir_path, 0)
+        write_log(dir_path, None, 1)
         write_log('')
         return
     write_log('{0:<12}{1:<20}{2:<15}'.format('status', 'attribute', 'key'))
@@ -171,12 +182,12 @@ def check_psu(check_list):
                 continue
             file_path = os.path.join(psu_path, attr)
             info = read_info(file_path)
-            if 'present' in attr and info[2] == '0':
+            if 'present' in attr and info[0] == '0':
                 log = ''.join([psu, ' is not present'])    
                 write_log(log)
                 break
             else:
-                write_log(info[0], info[1])
+                write_log(attr, info[0], info[1])
     write_log('')
     return
 
@@ -186,33 +197,34 @@ def check_Xsfp(check_list, modu_type):
     write_log(unit_name)
     dir_path = check_list[1].strip()    #get unit test path
     if os.path.exists(dir_path) == False:   #check path exist or not
-        write_log(dir_path, 0)
+        write_log(dir_path, None, 1)
         write_log('')
         return
     portX = os.listdir(dir_path)
     for port in portX:
         file_path = os.path.join(dir_path, port, 'identifier')    #check ports type 
         info = read_info(file_path) 
-        modu_id = info[2]
+        modu_id = info[0]
         if modu_id != '3':
             modu_id = '4'
         if modu_id == modu_type:
             tip = ''.join(['#********', port, '********#'])
             write_log(tip)
-            write_log('{0:<12}{1:<20}{2:<15}'.format('status', 'attribute', 'key'))
             attr = check_list[2].strip()    #check module plug in or out
             file_path = os.path.join(dir_path, port, attr)
             info = read_info(file_path) 
-            if info[2] == '0':
-                log = ''.join(['module plug out'])
+            if info[0] == '0':
+                log = ''.join(['     module plug out     '])
                 write_log(log)
                 write_log('')
             else:
+                write_log('{0:<12}{1:<20}{2:<15}'.format('status',\
+                            'attribute', 'key'))
                 for attr in check_list[2:]:
                     attr = attr.strip()
                     file_path = os.path.join(dir_path, port, attr)
                     info = read_info(file_path)
-                    write_log(info[0], info[1])
+                    write_log(attr, info[0], info[1])
                 write_log('')
         else:
             continue
@@ -225,7 +237,7 @@ def check_ctrl(check_list):
     write_log(unit_name)
     dir_path = check_list[1].strip()    #get unit test path
     if os.path.exists(dir_path) == False:   #check path exist or not
-        write_log(dir_path, 0)
+        write_log(dir_path, None, 1)
         write_log('')
         return
 
@@ -236,24 +248,22 @@ def check_ctrl(check_list):
     attr = check_list[2].strip()    #get fan number
     file_path = os.path.join(dir_path, attr)
     info = read_info(file_path)
-    if info[2].isdigit() and int(info[2]) < 20:
-        fan_number = info[2]
-        attr = ''.join([attr, '=',fan_number])
-        write_log(attr, 1)
+    if info[0].isdigit() and int(info[0]) < 20:#fan number must be a digist
+        fan_number = info[0]
+        write_log(attr, info[0], info[1])
     else:
-        write_log(attr, 2)
-        exit(-1)
+        write_log('fan number error')
+        return
 
     attr = check_list[3].strip()    #get fanr number
     file_path = os.path.join(dir_path, attr)
     info = read_info(file_path)
-    if info[2].isdigit() and int(info[2]) < 20:
-        fanr_number = info[2]
-        attr = ''.join([attr, '=',fanr_number])
-        write_log(attr, 1)
+    if info[0].isdigit() and int(info[0]) < 20:#fanr number must be a digist
+        fanr_number = info[0]
+        write_log(attr, info[0], info[1])
     else:
-        write_log(attr, 2)
-        exit(-1)
+        write_log('fanr number error')
+        return
 
     for attr in check_list[4:]:
         attr = attr.strip()
@@ -263,7 +273,7 @@ def check_ctrl(check_list):
                 attrX = attr.replace('X',str(n))
                 file_path = os.path.join(dir_path, attrX)
                 info = read_info(file_path)
-                write_log(info[0], info[1])
+                write_log(attrX, info[0], info[1])
                 n += 1
         elif 'fanrX' in attr:   #get fanrX info
             n = 1
@@ -271,12 +281,12 @@ def check_ctrl(check_list):
                 attrX = attr.replace('X',str(n))
                 file_path = os.path.join(dir_path, attrX)
                 info = read_info(file_path)
-                write_log(info[0], info[1])
+                write_log(attrX, info[0], info[1])
                 n += 1
         else:
             file_path = os.path.join(dir_path, attr)
             info = read_info(file_path)
-            write_log(info[0], info[1])
+            write_log(attr, info[0], info[1])
     write_log('')
     return
 
@@ -286,22 +296,22 @@ def check_leds(check_list):
     write_log(unit_name)
     dir_path = check_list[1].strip()    #get unit test path
     if os.path.exists(dir_path) == False:   #check path exist or not
-        write_log(dir_path, 0)
+        write_log(dir_path, None, 1)
         write_log('')
         return
     write_log('{0:<12}{1:<20}{2:<15}'.format('status', 'attribute', 'key'))
     attrX = [''.join([x, '/brightness'])    \
                 for x in os.listdir(dir_path) if 'psu' in x]
-    if 'psuX_led/brightness' in check_list:
-        check_list.remove('psuX_led/brightness')
+    if 'psuX_led/brightness\n' in check_list:
+        check_list.remove('psuX_led/brightness\n')
         #for attr in attrX:
         #    check_list.append(arrt)
-        check_list.extend(arrtX)
+        check_list.extend(attrX)
     for attr in check_list[2:]:
         attr = attr.strip()
         file_path = os.path.join(dir_path, attr)
         info = read_info(file_path)
-        write_log(info[0], info[1])
+        write_log(attr, info[0], info[1])
     write_log('')
     return
 
@@ -311,7 +321,7 @@ def check_watchdog(check_list):
     write_log(unit_name)
     dir_path = check_list[1].strip()    #get unit test path
     if os.path.exists(dir_path) == False:   #check path exist or not
-        write_log(dir_path, 0)
+        write_log(dir_path, None, 1)
         write_log('')
         return
     write_log('{0:<12}{1:<20}{2:<15}'.format('status', 'attribute', 'key'))
@@ -320,13 +330,11 @@ def check_watchdog(check_list):
     info = read_info(file_path)
     
     if int(info[2]) == 1:
-        tmp = ''.join([attr, ' is enable'])    
-        write_log(tmp)
+        write_log(attr, 'enable', 0)
     elif int(info[2]) == 0:
-        tmp = ''.join([attr,' is disable'])
-        write_log(tmp, 2)
+        write_log(attr, 'disable', 0)
     else:
-        write_log(info[0], info[1])
+        write_log(attr, info[0], info[1])
     write_log('')
     return
 
