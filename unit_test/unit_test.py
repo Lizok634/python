@@ -46,7 +46,7 @@ def init_log():
         write_log(info)
         write_log('')
     except IOError:
-        print "open log file failed"
+        print "open log file fail"
         os._exit(-1)
     return
 
@@ -57,25 +57,25 @@ def write_log(attr, value = None, ret = -1):
     try:
         log = open(log_file, 'a')
         if ret == 0:        #open file success,  write info to the log file
-            log.write('{0:<12}{1:<20}{2:<25}{3}'.format('[ pass ]',\
+            log.write('{0:<10}{1:<22}{2:<25}{3}'.format('[pass]',\
                         attr, value, '\n'))
-            print '{0:<12}{1:<20}{2:<25}'.format('[ pass ]', attr, value)
+            print '{0:<10}{1:<22}{2:<25}'.format('[pass]', attr, value)
         if ret == 1:        #sysfs path is not exist
-            log.write('{0:<12}{1}{2}'.format('[failed]',\
+            log.write('{0:<12}{1}{2}'.format('[fail]',\
                         attr, ' is not exist\n'))
-            print '{0:<12}{1}{2}'.format('[failed]', attr,' is not exist')
-        if ret == 2:        #open file failed, an empty file
-            log.write('{0:<12}{1:<20}{2}'.format('[failed]', attr, 'NULL\n'))
-            print '{0:<12}{1:<20}{2}'.format('[failed]', attr, 'NULL')
+            print '{0:<10}{1}{2}'.format('[fail]', attr,' is not exist')
+        if ret == 2:        #open file fail, an empty file
+            log.write('{0:<10}{1:<22}{2}'.format('[fail]', attr, 'NULL\n'))
+            print '{0:<10}{1:<22}{2}'.format('[fail]', attr, 'NULL')
         if ret == 3:        #error value
-            log.write('{0:<12}{1:<20}{2:<25}{3}'.format('[failed]',\
+            log.write('{0:<10}{1:<22}{2:<25}{3}'.format('[fail]',\
                         attr, value, '\n'))
-            print '{0:<12}{1:<20}{2:<25}'.format('[failed]', info, value)
+            print '{0:<10}{1:<22}{2:<25}'.format('[fail]', info, value)
         if ret == -1:       #print info without prefix
             log.write(attr + '\n')
             print attr
     except IOError:
-        print "open log file failed"
+        print "open log file fail"
         os._exit(-1)
     return log
 
@@ -98,7 +98,7 @@ def read_info(file_path):
         f.close()
         return value, 0
     except IOError:
-        #tmp = ''.join([file_name, ' open failed'])
+        #tmp = ''.join([file_name, ' open fail'])
         return value, 1
 
 #split config file
@@ -148,7 +148,7 @@ def check_hwinfo(check_list):
         write_log(dir_path, None, 1)
         write_log('')
         return
-    write_log('{0:<12}{1:<20}{2:<15}'.format('status', 'attribute', 'key'))
+    write_log('{0:<10}{1:<22}{2:<15}'.format('status', 'items', 'value'))
     for attr in check_list[2:]:
         attr = attr.strip()
         file_path = os.path.join(dir_path, attr)
@@ -172,7 +172,7 @@ def check_psu(check_list):
         psu_path = os.path.join(dir_path, psu)  #joint psu path
         tip = ''.join(['#********', psu, '********#'])
         write_log(tip)
-        write_log('{0:<12}{1:<20}{2:<15}'.format('status', 'attribute', 'key'))
+        write_log('{0:<10}{1:<22}{2:<15}'.format('status', 'items', 'value'))
         attrX = [''.join(x) for x in os.listdir(psu_path) \
                             if 'fan' in x or 'temp' in x]
         attrX.sort()
@@ -224,8 +224,8 @@ def check_Xsfp(check_list, modu_type):
             else:
                 tip = ''.join(['#********', port, '********#'])
                 write_log(tip)
-                write_log('{0:<12}{1:<20}{2:<15}'.format('status',\
-                            'attribute', 'key'))
+                write_log('{0:<10}{1:<22}{2:<15}'.format('status',\
+                            'items', 'value'))
                 for attr in check_list[2:]:
                     attr = attr.strip()
                     file_path = os.path.join(dir_path, port, attr)
@@ -249,7 +249,7 @@ def check_ctrl(check_list):
     fan_number = 0
     fanr_number = 0
 
-    write_log('{0:<12}{1:<20}{2:<15}'.format('status', 'attribute', 'key'))
+    write_log('{0:<10}{1:<22}{2:<15}'.format('status', 'items', 'value'))
     attr = check_list[2].strip()    #get fan number
     file_path = os.path.join(dir_path, attr)
     info = read_info(file_path)
@@ -304,7 +304,7 @@ def check_leds(check_list):
         write_log(dir_path, None, 1)
         write_log('')
         return
-    write_log('{0:<12}{1:<20}{2:<15}'.format('status', 'attribute', 'key'))
+    write_log('{0:<10}{1:<22}{2:<15}'.format('status', 'items', 'value'))
     attrX = [''.join([x, '/brightness'])    \
                 for x in os.listdir(dir_path) if 'psu' in x]
     if 'psuX_led/brightness\n' in check_list:
@@ -327,7 +327,7 @@ def check_watchdog(check_list):
         write_log(dir_path, None, 1)
         write_log('')
         return
-    write_log('{0:<12}{1:<20}{2:<15}'.format('status', 'attribute', 'key'))
+    write_log('{0:<10}{1:<22}{2:<15}'.format('status', 'items', 'value'))
     attr = check_list[2].strip()
     file_path = os.path.join(dir_path, attr)
     info = read_info(file_path)
