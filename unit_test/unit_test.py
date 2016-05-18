@@ -51,26 +51,30 @@ def init_log():
     return
 
 #write log file
-def write_log(attr, value = None, ret = -1):
+def write_log(attr, ret = -1, value = None, refer = '----'):
     if value == '':
         ret = 2
     try:
         log = open(log_file, 'a')
         if ret == 0:        #open file success,  write info to the log file
-            log.write('{0:<10}{1:<22}{2:<25}{3}'.format('[pass]',\
-                        attr, value, '\n'))
-            print '{0:<10}{1:<22}{2:<25}'.format('[pass]', attr, value)
-        if ret == 1:        #sysfs path is not exist
-            log.write('{0:<12}{1}{2}'.format('[fail]',\
-                        attr, ' is not exist\n'))
-            print '{0:<10}{1}{2}'.format('[fail]', attr,' is not exist')
+            log.write('{0:<22}{1:<32}{2:<18}{3:<6}{4}'.format(attr, \
+                    value, refer, '[pass]', '\n'))
+            print '{0:<22}{1:<32}{2:<18}{3:<6}'.format(attr, value, \
+                    refer, '[pass]')
+        if ret == 1:        #sysfs path or file is not exist
+            log.write('{0:<22}{1:<50}{2}'.format(attr, ' is not exist', \
+                    '[fail]\n'))
+            print '{0:<22}{1:<50}{2}'.format(attr,' is not exist', '[fail]')
         if ret == 2:        #open file fail, an empty file
-            log.write('{0:<10}{1:<22}{2}'.format('[fail]', attr, 'NULL\n'))
-            print '{0:<10}{1:<22}{2}'.format('[fail]', attr, 'NULL')
+            log.write('{0:<22}{1:<32}{2:<18}{3:<6}'.format(attr, '----', \
+                    refer, '[fail]\n'))
+            print '{0:<22}{1:<32}{2:<18}{3:<6}'.format(attr, '----', \
+                    refer, '[fail]')
         if ret == 3:        #error value
-            log.write('{0:<10}{1:<22}{2:<25}{3}'.format('[fail]',\
-                        attr, value, '\n'))
-            print '{0:<10}{1:<22}{2:<25}'.format('[fail]', info, value)
+            log.write('{0:<22}{1:<32}{2:<18}{3:<6}'.format(attr, value, \
+                    refer, '[fail]\n'))
+            print '{0:<22}{1:<32}{2:<18}{3:<6}'.format(attr, value, \
+                    refer, '[fail]')
         if ret == -1:       #print info without prefix
             log.write(attr + '\n')
             print attr
@@ -79,14 +83,17 @@ def write_log(attr, value = None, ret = -1):
         os._exit(-1)
     return log
 
-#path check
-def path_check(path_name, log):
-    if os.path.exists(path_name) == False:
-        print "%s is not exist" %path_name
-        log.write(path_name + "is not exit" + '\n')
-        log.close()
-        os._exit(-1)
-    return
+#check path
+def check_path(check_list):
+    unit_name = check_list[0].replace('#####','').strip()   #get unit name
+    write_log('{0:^72}'.format(unit_name))
+    dir_path = check_list[1].strip()    #joint path
+    if os.path.exists(dir_path) == False:   #check path exist or not
+        write_log(dir_path, 1)
+        write_log('')
+        return dir_path, 1
+    else:
+        return dir_path, 0
 
 #check info
 def read_info(file_path):
@@ -141,48 +148,68 @@ def check_sysfs(check_list):
 
 #check hwinfo
 def check_hwinfo(check_list):
-    unit_name = check_list[0].strip()
-    write_log(unit_name)
-    dir_path = check_list[1].strip()
-    if os.path.exists(dir_path) == False:
-        write_log(dir_path, None, 1)
-        write_log('')
+    ret = check_path(check_list)
+    if ret[1] != 0:
         return
-    write_log('{0:<10}{1:<22}{2:<15}'.format('status', 'items', 'value'))
-    for attr in check_list[2:]:
-        attr = attr.strip()
+    dir_path = ret[0]
+    write_log('{0:<22}{1:<32}{2:<18}{3:<8}'.format('items',\
+                'value','reference', 'result'))
+    for line in check_list[2:]:
+        line = line.strip().split('\t')
+        attr = line[0]
         file_path = os.path.join(dir_path, attr)
         info = read_info(file_path)
-        write_log(attr, info[0], info[1])
+        if len(line) == 2:
+            refer = line[1].strip()
+            write_log(attr, info[1], info[0], refer)
+        else:
+            write_log(attr, info[1], info[0])
     write_log('')
     return
 
 #check psu
 def check_psu(check_list):
-    unit_name = check_list[0].strip()   #print unit test name
-    write_log(unit_name)
-    dir_path = check_list[1].strip()    #get unit test path
-    if os.path.exists(dir_path) == False:   #check path exist or not
-        write_log(dir_path, None, 1)
-        write_log('')
+    ret = check_path(check_list)
+    if ret[1] != 0:
         return
+    dir_path = ret[0]
+
     psu_num = os.listdir(dir_path)
     for psu in psu_num:
         X = psu.replace('psu', '')  #get psu num
         psu_path = os.path.join(dir_path, psu)  #joint psu path
-        tip = ''.join(['#********', psu, '********#'])
-        write_log(tip)
-        write_log('{0:<10}{1:<22}{2:<15}'.format('status', 'items', 'value'))
+        tip = ''.join(['#****************', psu, '****************#'])
+        write_log('{0:^72}'.format(tip))
+        write_log('{0:<22}{1:<32}{2:<18}{3:<8}'.format('items', \
+                'value','reference', 'result'))
         attrX = [''.join(x) for x in os.listdir(psu_path) \
                             if 'fan' in x or 'temp' in x]
         attrX.sort()
-        tmp_list = copy.deepcopy(check_list)#copy check_list to tmp_list
+        tmp_list = copy.deepcopy(check_list)    #copy check_list to tmp_list
         tmp_list.extend(attrX)
 
-        for attr in tmp_list[2:]:
-            attr = attr.strip()
-            if 'X' in attr:         #ignore contain X attr
+        refer_tempX_input = '[-12800-127996]'
+        refer_fanX_input = '[0-65535]'
+        refer_fanX_pwm = '[0-255]'
+        refer_fanX_fault = '[0-1]'
+
+        for line in tmp_list[2:]:
+            line = line.strip().split('\t')
+            attr = line[0]
+            if 'X' in attr:     #ignore contain X attr
                 continue
+            refer = '----'
+            if len(line) == 2:
+                refer = line[1].strip()
+            else:
+                if 'temp' in attr and 'input' in attr:
+                    refer = refer_tempX_input
+                elif 'fan' in attr and 'input' in attr:
+                    refer = refer_fanX_input
+                elif 'fan' in attr and 'pwm' in attr:
+                    refer = refer_fanX_pwm
+                elif 'fan' in attr and 'fault' in attr:
+                    refer = refer_fanX_fault
             file_path = os.path.join(psu_path, attr)
             info = read_info(file_path)
             if 'present' in attr and info[0] == '0':
@@ -190,22 +217,20 @@ def check_psu(check_list):
                 write_log(log)
                 break
             else:
-                write_log(attr, info[0], info[1])
+                write_log(attr, info[1], info[0], refer)
     write_log('')
     return
 
 #check ports sfp or qsfp
 def check_Xsfp(check_list, modu_type):
-    unit_name = check_list[0].strip()   #print unit test name
-    write_log(unit_name)
-    dir_path = check_list[1].strip()    #get unit test path
-    if os.path.exists(dir_path) == False:   #check path exist or not
-        write_log(dir_path, None, 1)
-        write_log('')
+    ret = check_path(check_list)
+    if ret[1] != 0:
         return
+    dir_path = ret[0]
+
     portX = os.listdir(dir_path)
     for port in portX:
-        file_path = os.path.join(dir_path, port, 'identifier')    #check ports type
+        file_path = os.path.join(dir_path, port, 'identifier')#check ports type
         info = read_info(file_path)
         modu_id = info[0]
         if modu_id != '3':
@@ -213,24 +238,30 @@ def check_Xsfp(check_list, modu_type):
         if modu_id == modu_type:
             #tip = ''.join(['#********', port, '********#'])
             #write_log(tip)
-            attr = check_list[2].strip()    #check module plug in or out
+            line = check_list[2].strip()
+            line = line.strip().split('\t')
+            attr = line[0]
             file_path = os.path.join(dir_path, port, attr)
             info = read_info(file_path)
-            if info[0] == '0':
+            if info[0] == '0':  #check module plug in or out
                 #log = ''.join(['     module plug out     '])
                 #write_log(log)
                 #write_log('')
                 pass
             else:
-                tip = ''.join(['#********', port, '********#'])
-                write_log(tip)
-                write_log('{0:<10}{1:<22}{2:<15}'.format('status',\
-                            'items', 'value'))
-                for attr in check_list[2:]:
-                    attr = attr.strip()
+                tip = ''.join(['#****************', port, '****************#'])
+                write_log('{0:^72}'.format(tip))
+                write_log('{0:<22}{1:<32}{2:<18}{3:<8}'.format('items', \
+                        'value','reference', 'result'))
+                for line in check_list[2:]:
+                    line = line.strip().split('\t')
+                    attr = line[0]
+                    refer = '----'
+                    if len(line) == 2:
+                        refer = line[1].strip()
                     file_path = os.path.join(dir_path, port, attr)
                     info = read_info(file_path)
-                    write_log(attr, info[0], info[1])
+                    write_log(attr, info[1], info[0], refer)
         else:
             continue
     write_log('')
@@ -238,47 +269,56 @@ def check_Xsfp(check_list, modu_type):
 
 #check ctrl
 def check_ctrl(check_list):
-    unit_name = check_list[0].strip()   #print unit test name
-    write_log(unit_name)
-    dir_path = check_list[1].strip()    #get unit test path
-    if os.path.exists(dir_path) == False:   #check path exist or not
-        write_log(dir_path, None, 1)
-        write_log('')
+    ret = check_path(check_list)
+    if ret[1] != 0:
         return
+    dir_path = ret[0]
 
     fan_number = 0
     fanr_number = 0
+    refer = '----'
 
-    write_log('{0:<10}{1:<22}{2:<15}'.format('status', 'items', 'value'))
-    attr = check_list[2].strip()    #get fan number
+    write_log('{0:<22}{1:<32}{2:<18}{3:<8}'.format('items', \
+                'value','reference', 'result'))
+    line = check_list[2].strip().split('\t')    #get fan number
+    attr = line[0]
+    if len(line) == 2:
+        refer = line[1].strip()
     file_path = os.path.join(dir_path, attr)
     info = read_info(file_path)
     if info[0].isdigit() and int(info[0]) < 20:#fan number must be a digist
         fan_number = info[0]
-        write_log(attr, info[0], info[1])
+        write_log(attr, info[1], info[0], refer)
     else:
         write_log('fan number error')
         return
 
-    attr = check_list[3].strip()    #get fanr number
+    line = check_list[3].strip().split('\t')    #get fanr number
+    attr = line[0]
+    if len(line) == 2:
+        refer = line[1].strip()
     file_path = os.path.join(dir_path, attr)
     info = read_info(file_path)
     if info[0].isdigit() and int(info[0]) < 20:#fanr number must be a digist
         fanr_number = info[0]
-        write_log(attr, info[0], info[1])
+        write_log(attr, info[1], info[0], refer)
     else:
         write_log('fanr number error')
         return
 
-    for attr in check_list[4:]:
-        attr = attr.strip()
+    for line in check_list[4:]:
+        line = line.strip().split('\t')
+        attr = line[0]
+        refer = '----'
+        if len(line) == 2:
+            refer = line[1].strip()
         if 'fanX' in attr:  #get fanX info
             n = 1
             while n <= int(fan_number):
                 attrX = attr.replace('X',str(n))
                 file_path = os.path.join(dir_path, attrX)
                 info = read_info(file_path)
-                write_log(attrX, info[0], info[1])
+                write_log(attrX, info[1], info[0], refer)
                 n += 1
         elif 'fanrX' in attr:   #get fanrX info
             n = 1
@@ -286,58 +326,66 @@ def check_ctrl(check_list):
                 attrX = attr.replace('X',str(n))
                 file_path = os.path.join(dir_path, attrX)
                 info = read_info(file_path)
-                write_log(attrX, info[0], info[1])
+                write_log(attrX, info[1], info[0], refer)
                 n += 1
         else:
             file_path = os.path.join(dir_path, attr)
             info = read_info(file_path)
-            write_log(attr, info[0], info[1])
+            write_log(attr, info[1], info[0], refer)
     write_log('')
     return
 
 #check leds
 def check_leds(check_list):
-    unit_name = check_list[0].strip()   #print unit test name
-    write_log(unit_name)
-    dir_path = check_list[1].strip()    #get unit test path
-    if os.path.exists(dir_path) == False:   #check path exist or not
-        write_log(dir_path, None, 1)
-        write_log('')
+    ret = check_path(check_list)
+    if ret[1] != 0:
         return
-    write_log('{0:<10}{1:<22}{2:<15}'.format('status', 'items', 'value'))
+    dir_path = ret[0]
+
+    write_log('{0:<22}{1:<32}{2:<18}{3:<8}'.format('items', \
+                'value','reference', 'result'))
     attrX = [''.join([x, '/brightness'])    \
                 for x in os.listdir(dir_path) if 'psu' in x]
-    if 'psuX_led/brightness\n' in check_list:
-        check_list.remove('psuX_led/brightness\n')
-        check_list.extend(attrX)
-    for attr in check_list[2:]:
-        attr = attr.strip()
+    
+    check_list.extend(attrX)
+    refer_psuX_led = '[0-3]'
+    
+    for line in check_list[2:]:
+        line = line.strip().split('\t')
+        attr = line[0]
+        refer = '----'
+        if 'X' in attr:
+            continue
+        if len(line) == 2:
+            refer = line[1].strip()
+        else:
+            if 'psu' in attr and 'led' in attr:
+                refer = refer_psuX_led
         file_path = os.path.join(dir_path, attr)
         info = read_info(file_path)
-        write_log(attr, info[0], info[1])
+        write_log(attr, info[1], info[0], refer)
     write_log('')
     return
 
 #check watchdog
 def check_watchdog(check_list):
-    unit_name = check_list[0].strip()   #print unit test name
-    write_log(unit_name)
-    dir_path = check_list[1].strip()    #get unit test path
-    if os.path.exists(dir_path) == False:   #check path exist or not
-        write_log(dir_path, None, 1)
-        write_log('')
+    ret = check_path(check_list)
+    if ret[1] != 0:
         return
-    write_log('{0:<10}{1:<22}{2:<15}'.format('status', 'items', 'value'))
+    dir_path = ret[0]
+
+    write_log('{0:<22}{1:<32}{2:<18}{3:<8}'.format('items', \
+                'value','reference', 'result'))
     attr = check_list[2].strip()
     file_path = os.path.join(dir_path, attr)
     info = read_info(file_path)
 
-    if int(info[2]) == 1:
-        write_log(attr, 'enable', 0)
-    elif int(info[2]) == 0:
-        write_log(attr, 'disable', 0)
+    if int(info[0]) == 1:
+        write_log(attr, 0,'enable')
+    elif int(info[0]) == 0:
+        write_log(attr, 3,'disable')
     else:
-        write_log(attr, info[0], info[1])
+        write_log(attr, info[1], info[0])
     write_log('')
     return
 

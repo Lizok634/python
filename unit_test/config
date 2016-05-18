@@ -4,102 +4,102 @@
 
 ##### hwinfo information
 /sys/class/swmon/hwinfo
-product_name
-part_number
-serial_number
+product_name	    [max 32 char]
+part_number	    [max 32 char]
+serial_number	    [max 32 char]
 mac_address
-device_version
-platform_name
-onie_version
-vendor_name
-cpld1_version
-cpld2_version
-cpld3_version
+device_version	    [max 32 char]
+platform_name	    [max 32 char]
+onie_version	    [max 32 char]
+vendor_name	    [max 32 char]
+cpld1_version	    [max 32 char]
+cpld2_version	    [max 32 char]
+cpld3_version	    [max 32 char]
 
 ##### psu information
 /sys/class/swmon/psu
-present
-power_good
-power_alarm
-serial_number
-model_name
-tempX_input
-fanX_input
-fanX_pwm
-fanX_fault
+ present	    [0-1]
+power_good	    [0-1]
+power_alarm	    [0-1]
+tempX_input	    [-12800-127996]
+fanX_input	    [0-21500]
+fanX_pwm	    [0-255]
+fanX_fault	    [0-1]
+serial_number	    [max 24 char]
+model_name	    [max 32 char]
 
 ##### sfp/sfp+ ports information
 /sys/class/swmon/ports
-plugged_in
-identifier
-connector_type
-transceiver_code
-length_smf
-length_sm
-length_om1
-length_om2
-length_om3
-length_om4
-vendor_name
-vendor_pn
-wavelength
-vendor_sn
-update_enable
-temperature
-supply_voltage
-bias_current
-tx_power
-rx_power
+plugged_in	    [0-1]
+identifier	    [0-255]
+connector_type	    [0-255]
+transceiver_code	[0-255]
+length_smf	    [0-255]
+length_sm	    [0-255]
+length_om1	    [0-255]
+length_om2	    [0-255]
+length_om3	    [0-255]
+length_om4	    [0-255]
+wavelength	    [0-65535]
+update_enable	    [0-1]
+temperature	    [-12800-127996]
+supply_voltage	    [0-65535]
+bias_current	    [0-65535]
+tx_power	    [0-65535]
+rx_power	    [0-65535]
+vendor_name	    [max 16 char]
+vendor_pn	    [max 16 char]
+vendor_sn	    [max 16 char]
 
 ##### qsfp ports information
 /sys/class/swmon/ports
-plugged_in
-identifier
-ext_identifier
-connector_type
-transceiver_code
-length_smf
-length_om1
-length_om2
-length_om3
-length_om4
-vendor_name
-vendor_pn
-wavelength
-vendor_sn
-update_enable
-temperature
-supply_voltage
-rx1_power
-rx2_power
-rx3_power
-rx4_power
-tx1_bias_current
-tx2_bias_current
-tx3_bias_current
-tx4_bias_current
+plugged_in	    [0-1]
+identifier	    [0-255]
+ext_identifier	    [0-255]
+connector_type	    [0-255]
+transceiver_code	[0-255]
+length_smf	    [0-255]
+length_om1	    [0-255]
+length_om2	    [0-255]
+length_om3	    [0-255]
+length_om4	    [0-255]
+wavelength	    [0-65535]
+update_enable	    [0-1]
+temperature	    [-12800-127996]
+supply_voltage	    [0-65535]
+rx1_power	    [0-65535]
+rx2_power	    [0-65535]
+rx3_power	    [0-65535]
+rx4_power	    [0-65535]
+tx1_bias_current	[0-65535]
+tx2_bias_current	[0-65535]
+tx3_bias_current	[0-65535]
+tx4_bias_current	[0-65535]
+vendor_sn	    [max 16 char]
+vendor_name	    [max 16 char]
+vendor_pn	    [max 16 char]
 
 ##### ctrl information
 /sys/class/swmon/ctrl
-fan_number
-fanr_number
-fan_direction
-cpu_temp_input
-switch_temp_input
-board_temp_input
-start_mode
-fanX_input
-fanrX_input
-fanX_pwm
-fanX_fault
-fanrX_fault
+fan_number	    [0-255]
+fanr_number	    [0-255]
+fan_direction	    [0-1]
+cpu_temp_input	    [-12800-127996]
+switch_temp_input	[-12800-127996]
+board_temp_input	[-12800-127996]
+start_mode	    [0-1]
+fanX_input	    [0-65535]
+fanrX_input	    [0-65535]
+fanX_pwm	    [0-255]
+fanX_fault	    [0-1]
+fanrX_fault	    [0-1]
 
 ##### leds information
 /sys/class/leds
-psuX_led/brightness
-fan_led/brightness
-diag_led/brightness
-loc_led/brightness
+psuX_led/brightness	[0-3]
+fan_led/brightness	[0-3]
+diag_led/brightness	[0-2]
+loc_led/brightness	[0-1]
 
 ##### watchdog information
 /sys/class/watchdog/watchdog0
