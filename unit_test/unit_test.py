@@ -20,6 +20,8 @@ import datetime
 log_file = 'check_log'
 config_file = 'config'
 
+ERRNO ={'EPATH':1, 'EEMPTY':2, 'EVALUE':3, 'EINVALID':4}  #err number
+
 #init log file
 def init_log():
     try:
@@ -52,8 +54,6 @@ def init_log():
 
 #write log file
 def write_log(attr, ret = -1, value = None, refer = '----'):
-    if value == '':
-        ret = 2
     try:
         log = open(log_file, 'a')
         if ret == 0:        #open file success,  write info to the log file
@@ -63,18 +63,23 @@ def write_log(attr, ret = -1, value = None, refer = '----'):
                     refer, '[pass]')
         if ret == 1:        #sysfs path or file is not exist
             log.write('{0:<22}{1:<50}{2}'.format(attr, ' is not exist', \
-                    '[fail]\n'))
-            print '{0:<22}{1:<50}{2}'.format(attr,' is not exist', '[fail]')
+                    '[*fail*]\n'))
+            print '{0:<22}{1:<50}{2}'.format(attr,' is not exist', '[*fail*]')
         if ret == 2:        #open file fail, an empty file
             log.write('{0:<22}{1:<32}{2:<18}{3:<6}'.format(attr, '----', \
                     refer, '[fail]\n'))
             print '{0:<22}{1:<32}{2:<18}{3:<6}'.format(attr, '----', \
-                    refer, '[fail]')
+                    refer, '[*fail*]')
         if ret == 3:        #error value
             log.write('{0:<22}{1:<32}{2:<18}{3:<6}'.format(attr, value, \
-                    refer, '[fail]\n'))
+                    refer, '[*fail*]\n'))
             print '{0:<22}{1:<32}{2:<18}{3:<6}'.format(attr, value, \
-                    refer, '[fail]')
+                    refer, '[*fail*]')
+        if ret == 4:        #error invalid value
+            log.write('{0:<22}{1:<32}{2:<18}{3:<6}'.format(attr, value, \
+                    refer, '[invalid]\n'))
+            print '{0:<22}{1:<32}{2:<18}{3:<6}'.format(attr, value, \
+                    refer, '[invalid]')
         if ret == -1:       #print info without prefix
             log.write(attr + '\n')
             print attr
@@ -91,7 +96,7 @@ def check_path(check_list):
     if os.path.exists(dir_path) == False:   #check path exist or not
         write_log(dir_path, 1)
         write_log('')
-        return dir_path, 1
+        return dir_path, ERRNO['EPATH'] 
     else:
         return dir_path, 0
 
@@ -106,7 +111,7 @@ def read_info(file_path):
         return value, 0
     except IOError:
         #tmp = ''.join([file_name, ' open fail'])
-        return value, 1
+        return value, ERRNO['EPATH']
 
 #split config file
 def config_split():
@@ -126,6 +131,44 @@ def config_split():
                 a=config_tab[arr[i] + 1 : arr[i+1]]
                 check_list.append(a)
     return  check_list
+
+#check value 
+def check_value(attr, value, refer):
+    if len(value) == 0:
+        return ERRNO['EEMPTY']
+    if 'max' in refer and 'char' in refer:
+        refer = (re.findall(r'\d+',refer))
+        refer[0] = int(refer[0])
+        if len(value) <= refer:
+            return 0
+    elif '-' in refer:
+        if '-' in value:    #judge for negative number
+            value = int(value)
+        elif value.isdigit():
+            value = int(value)
+        else:
+            return ERRNO['EEMPTY']
+        refer = re.findall(r'\d+',refer)
+        refer[0] = int(refer[0])
+        refer[1] = int(refer[1])
+        if 'temp' in attr:
+            if value > -1*refer[0] and value <= refer[1]:
+                return 0
+            elif value == -128000:
+                return ERRNO['EINVALID']
+            else:
+                return ERRNO['EVALUE']
+        elif 'fault' in attr:
+            if value == 0:
+                return 0
+            elif value == 1:    #XXX_fault = 1  represent device XXX is fault
+                return ERRNO['EVALUE']
+        else:
+            if value >= int(refer[0]) and value <= int(refer[1]):
+                return 0
+            else:
+                return ERRNO['EVALUE']
+    return
 
 #check sysfs
 def check_sysfs(check_list):
@@ -159,11 +202,14 @@ def check_hwinfo(check_list):
         attr = line[0]
         file_path = os.path.join(dir_path, attr)
         info = read_info(file_path)
+        value = info[0]
+        ret = info[1]
         if len(line) == 2:
             refer = line[1].strip()
-            write_log(attr, info[1], info[0], refer)
+            ret = check_value(attr, value, refer)
+            write_log(attr, ret, value, refer)
         else:
-            write_log(attr, info[1], info[0])
+            write_log(attr, ret, value)
     write_log('')
     return
 
@@ -188,36 +234,51 @@ def check_psu(check_list):
         tmp_list = copy.deepcopy(check_list)    #copy check_list to tmp_list
         tmp_list.extend(attrX)
 
-        refer_tempX_input = '[-12800-127996]'
-        refer_fanX_input = '[0-65535]'
-        refer_fanX_pwm = '[0-255]'
-        refer_fanX_fault = '[0-1]'
+        refer_tempX_input = ''
+        refer_fanX_input = ''
+        refer_fanX_pwm = ''
+        refer_fanX_fault = ''
 
         for line in tmp_list[2:]:
             line = line.strip().split('\t')
             attr = line[0]
-            if 'X' in attr:     #ignore contain X attr
-                continue
             refer = '----'
             if len(line) == 2:
                 refer = line[1].strip()
-            else:
-                if 'temp' in attr and 'input' in attr:
-                    refer = refer_tempX_input
-                elif 'fan' in attr and 'input' in attr:
-                    refer = refer_fanX_input
-                elif 'fan' in attr and 'pwm' in attr:
-                    refer = refer_fanX_pwm
-                elif 'fan' in attr and 'fault' in attr:
-                    refer = refer_fanX_fault
+            if 'tempX_input' in attr:     #record reference
+                refer_tempX_input = refer
+                continue
+            elif 'fanX_input' in attr:
+                refer_fanX_input = refer
+                continue
+            elif 'fanX_pwm' in attr:
+                refer_fanX_pwm = refer
+                continue
+            elif 'fanX_fault' in attr:
+                refer_fanX_fault = refer
+                continue
+            elif 'X' in attr:
+                continue
+
+            if 'temp' in attr and 'input' in attr:
+                refer = refer_tempX_input
+            elif 'fan' in attr and 'input' in attr:
+                refer = refer_fanX_input
+            elif 'fan' in attr and 'pwm' in attr:
+                refer = refer_fanX_pwm
+            elif 'fan' in attr and 'fault' in attr:
+                refer = refer_fanX_fault
             file_path = os.path.join(psu_path, attr)
             info = read_info(file_path)
+            value = info[0]
+            ret = info[1]
             if 'present' in attr and info[0] == '0':
                 log = ''.join([psu, ' is not present'])
                 write_log(log)
                 break
             else:
-                write_log(attr, info[1], info[0], refer)
+                ret = check_value(attr, value, refer)
+                write_log(attr, ret, value, refer)
     write_log('')
     return
 
@@ -243,7 +304,8 @@ def check_Xsfp(check_list, modu_type):
             attr = line[0]
             file_path = os.path.join(dir_path, port, attr)
             info = read_info(file_path)
-            if info[0] == '0':  #check module plug in or out
+            value = info[0]
+            if value == '0':  #check module plug in or out
                 #log = ''.join(['     module plug out     '])
                 #write_log(log)
                 #write_log('')
@@ -261,7 +323,9 @@ def check_Xsfp(check_list, modu_type):
                         refer = line[1].strip()
                     file_path = os.path.join(dir_path, port, attr)
                     info = read_info(file_path)
-                    write_log(attr, info[1], info[0], refer)
+                    value = info[0]
+                    ret = check_value(attr, value, refer)
+                    write_log(attr, ret, value, refer)
         else:
             continue
     write_log('')
@@ -286,9 +350,12 @@ def check_ctrl(check_list):
         refer = line[1].strip()
     file_path = os.path.join(dir_path, attr)
     info = read_info(file_path)
-    if info[0].isdigit() and int(info[0]) < 20:#fan number must be a digist
+    value = info[0]
+    ret = info[1]
+    if value.isdigit() and int(value) < 20:#fan number must be a digist
         fan_number = info[0]
-        write_log(attr, info[1], info[0], refer)
+        ret = check_value(attr, value, refer)
+        write_log(attr, ret, value, refer)
     else:
         write_log('fan number error')
         return
@@ -299,9 +366,12 @@ def check_ctrl(check_list):
         refer = line[1].strip()
     file_path = os.path.join(dir_path, attr)
     info = read_info(file_path)
+    value = info[0]
+    ret = info[1]
     if info[0].isdigit() and int(info[0]) < 20:#fanr number must be a digist
         fanr_number = info[0]
-        write_log(attr, info[1], info[0], refer)
+        ret = check_value(attr, value, refer)
+        write_log(attr, ret, value, refer)
     else:
         write_log('fanr number error')
         return
@@ -318,7 +388,9 @@ def check_ctrl(check_list):
                 attrX = attr.replace('X',str(n))
                 file_path = os.path.join(dir_path, attrX)
                 info = read_info(file_path)
-                write_log(attrX, info[1], info[0], refer)
+                value = info[0]
+                ret = check_value(attr, value, refer)
+                write_log(attrX, ret, value, refer)
                 n += 1
         elif 'fanrX' in attr:   #get fanrX info
             n = 1
@@ -326,12 +398,16 @@ def check_ctrl(check_list):
                 attrX = attr.replace('X',str(n))
                 file_path = os.path.join(dir_path, attrX)
                 info = read_info(file_path)
-                write_log(attrX, info[1], info[0], refer)
+                value = info[0]
+                ret = check_value(attr, value, refer)
+                write_log(attrX, ret, value, refer)
                 n += 1
         else:
             file_path = os.path.join(dir_path, attr)
             info = read_info(file_path)
-            write_log(attr, info[1], info[0], refer)
+            value = info[0]
+            ret = check_value(attr, value, refer)
+            write_log(attr, ret, value, refer)
     write_log('')
     return
 
@@ -348,22 +424,28 @@ def check_leds(check_list):
                 for x in os.listdir(dir_path) if 'psu' in x]
     
     check_list.extend(attrX)
-    refer_psuX_led = '[0-3]'
+    refer_psuX_led = ''
     
     for line in check_list[2:]:
         line = line.strip().split('\t')
         attr = line[0]
         refer = '----'
-        if 'X' in attr:
-            continue
         if len(line) == 2:
             refer = line[1].strip()
-        else:
-            if 'psu' in attr and 'led' in attr:
-                refer = refer_psuX_led
+        if 'psuX_led' in attr:
+            refer_psuX_led = refer 
+            continue
+        elif 'X' in attr:
+            continue
+
+        if 'psu' in attr and 'led' in attr:
+            refer = refer_psuX_led
+        
         file_path = os.path.join(dir_path, attr)
         info = read_info(file_path)
-        write_log(attr, info[1], info[0], refer)
+        value = info[0]
+        ret = check_value(attr, value, refer)
+        write_log(attr, ret, value, refer)
     write_log('')
     return
 
@@ -379,13 +461,15 @@ def check_watchdog(check_list):
     attr = check_list[2].strip()
     file_path = os.path.join(dir_path, attr)
     info = read_info(file_path)
+    value = info[0]
+    ret = info[1]
 
     if int(info[0]) == 1:
         write_log(attr, 0,'enable')
     elif int(info[0]) == 0:
         write_log(attr, 3,'disable')
     else:
-        write_log(attr, info[1], info[0])
+        write_log(attr, ret, value)
     write_log('')
     return
 
