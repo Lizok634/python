@@ -1,9 +1,9 @@
 # this is a check configure list file
 # creat time : 2016.5.3
-# modify time : 
+# modify time :2016.5.19 
 
 ##### hwinfo information
-/sys/class/swmon/hwinfo
+/sys/class/swmon/24c02
 product_name	    [max 32 char]
 part_number	    [max 32 char]
 serial_number	    [max 32 char]

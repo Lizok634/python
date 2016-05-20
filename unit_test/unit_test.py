@@ -14,6 +14,7 @@ This is a kernel sysfs unit test script
 import os
 import re
 import copy
+import time
 import os.path
 import datetime
 
@@ -96,7 +97,7 @@ def check_path(check_list):
     if os.path.exists(dir_path) == False:   #check path exist or not
         write_log(dir_path, 1)
         write_log('')
-        return dir_path, ERRNO['EPATH'] 
+        return dir_path, ERRNO['EPATH']
     else:
         return dir_path, 0
 
@@ -132,7 +133,7 @@ def config_split():
                 check_list.append(a)
     return  check_list
 
-#check value 
+#check value
 def check_value(attr, value, refer):
     if len(value) == 0:
         return ERRNO['EEMPTY']
@@ -194,13 +195,14 @@ def check_hwinfo(check_list):
     ret = check_path(check_list)
     if ret[1] != 0:
         return
-    dir_path = ret[0]
+    global hwinfo_path
+    hwinfo_path = ret[0]
     write_log('{0:<22}{1:<32}{2:<18}{3:<8}'.format('items',\
                 'value','reference', 'result'))
     for line in check_list[2:]:
         line = line.strip().split('\t')
         attr = line[0]
-        file_path = os.path.join(dir_path, attr)
+        file_path = os.path.join(hwinfo_path, attr)
         info = read_info(file_path)
         value = info[0]
         ret = info[1]
@@ -218,20 +220,22 @@ def check_psu(check_list):
     ret = check_path(check_list)
     if ret[1] != 0:
         return
-    dir_path = ret[0]
+    global psu_path
+    psu_path = ret[0]
+    global psu_no
 
-    psu_num = os.listdir(dir_path)
+    psu_num = os.listdir(psu_path)
     for psu in psu_num:
         X = psu.replace('psu', '')  #get psu num
-        psu_path = os.path.join(dir_path, psu)  #joint psu path
+        psuX_path = os.path.join(psu_path, psu)  #joint psu path
         tip = ''.join(['#****************', psu, '****************#'])
         write_log('{0:^72}'.format(tip))
         write_log('{0:<22}{1:<32}{2:<18}{3:<8}'.format('items', \
                 'value','reference', 'result'))
-        attrX = [''.join(x) for x in os.listdir(psu_path) \
+        attrX = [''.join(x) for x in os.listdir(psuX_path) \
                             if 'fan' in x or 'temp' in x]
         attrX.sort()
-        tmp_list = copy.deepcopy(check_list)    #copy check_list to tmp_list
+        tmp_list = copy.deepcopy(check_list)    #deep copy check_list to tmp_list
         tmp_list.extend(attrX)
 
         refer_tempX_input = ''
@@ -268,7 +272,7 @@ def check_psu(check_list):
                 refer = refer_fanX_pwm
             elif 'fan' in attr and 'fault' in attr:
                 refer = refer_fanX_fault
-            file_path = os.path.join(psu_path, attr)
+            file_path = os.path.join(psuX_path, attr)
             info = read_info(file_path)
             value = info[0]
             ret = info[1]
@@ -279,6 +283,8 @@ def check_psu(check_list):
             else:
                 ret = check_value(attr, value, refer)
                 write_log(attr, ret, value, refer)
+                if 'power_good' in attr and int(value) == 1:
+                    psu_no = psu
     write_log('')
     return
 
@@ -287,11 +293,13 @@ def check_Xsfp(check_list, modu_type):
     ret = check_path(check_list)
     if ret[1] != 0:
         return
-    dir_path = ret[0]
+    global Xsfp_path
+    Xsfp_path = ret[0]
+    global Xsfp_port
 
-    portX = os.listdir(dir_path)
+    portX = os.listdir(Xsfp_path)
     for port in portX:
-        file_path = os.path.join(dir_path, port, 'identifier')#check ports type
+        file_path = os.path.join(Xsfp_path, port, 'identifier')#check ports type
         info = read_info(file_path)
         modu_id = info[0]
         if modu_id != '3':
@@ -302,7 +310,7 @@ def check_Xsfp(check_list, modu_type):
             line = check_list[2].strip()
             line = line.strip().split('\t')
             attr = line[0]
-            file_path = os.path.join(dir_path, port, attr)
+            file_path = os.path.join(Xsfp_path, port, attr)
             info = read_info(file_path)
             value = info[0]
             if value == '0':  #check module plug in or out
@@ -312,6 +320,7 @@ def check_Xsfp(check_list, modu_type):
                 pass
             else:
                 tip = ''.join(['#****************', port, '****************#'])
+                Xsfp_port = port    #get a Xsfp present port for time cost calc
                 write_log('{0:^72}'.format(tip))
                 write_log('{0:<22}{1:<32}{2:<18}{3:<8}'.format('items', \
                         'value','reference', 'result'))
@@ -321,7 +330,7 @@ def check_Xsfp(check_list, modu_type):
                     refer = '----'
                     if len(line) == 2:
                         refer = line[1].strip()
-                    file_path = os.path.join(dir_path, port, attr)
+                    file_path = os.path.join(Xsfp_path, port, attr)
                     info = read_info(file_path)
                     value = info[0]
                     ret = check_value(attr, value, refer)
@@ -336,7 +345,8 @@ def check_ctrl(check_list):
     ret = check_path(check_list)
     if ret[1] != 0:
         return
-    dir_path = ret[0]
+    global ctrl_path
+    ctrl_path = ret[0]
 
     fan_number = 0
     fanr_number = 0
@@ -348,7 +358,7 @@ def check_ctrl(check_list):
     attr = line[0]
     if len(line) == 2:
         refer = line[1].strip()
-    file_path = os.path.join(dir_path, attr)
+    file_path = os.path.join(ctrl_path, attr)
     info = read_info(file_path)
     value = info[0]
     ret = info[1]
@@ -364,7 +374,7 @@ def check_ctrl(check_list):
     attr = line[0]
     if len(line) == 2:
         refer = line[1].strip()
-    file_path = os.path.join(dir_path, attr)
+    file_path = os.path.join(ctrl_path, attr)
     info = read_info(file_path)
     value = info[0]
     ret = info[1]
@@ -386,7 +396,7 @@ def check_ctrl(check_list):
             n = 1
             while n <= int(fan_number):
                 attrX = attr.replace('X',str(n))
-                file_path = os.path.join(dir_path, attrX)
+                file_path = os.path.join(ctrl_path, attrX)
                 info = read_info(file_path)
                 value = info[0]
                 ret = check_value(attr, value, refer)
@@ -396,14 +406,14 @@ def check_ctrl(check_list):
             n = 1
             while n <= int(fanr_number):
                 attrX = attr.replace('X',str(n))
-                file_path = os.path.join(dir_path, attrX)
+                file_path = os.path.join(ctrl_path, attrX)
                 info = read_info(file_path)
                 value = info[0]
                 ret = check_value(attr, value, refer)
                 write_log(attrX, ret, value, refer)
                 n += 1
         else:
-            file_path = os.path.join(dir_path, attr)
+            file_path = os.path.join(ctrl_path, attr)
             info = read_info(file_path)
             value = info[0]
             ret = check_value(attr, value, refer)
@@ -416,16 +426,17 @@ def check_leds(check_list):
     ret = check_path(check_list)
     if ret[1] != 0:
         return
-    dir_path = ret[0]
+    global leds_path
+    leds_path = ret[0]
 
     write_log('{0:<22}{1:<32}{2:<18}{3:<8}'.format('items', \
                 'value','reference', 'result'))
     attrX = [''.join([x, '/brightness'])    \
-                for x in os.listdir(dir_path) if 'psu' in x]
-    
+                for x in os.listdir(leds_path) if 'psu' in x]
+
     check_list.extend(attrX)
     refer_psuX_led = ''
-    
+
     for line in check_list[2:]:
         line = line.strip().split('\t')
         attr = line[0]
@@ -433,15 +444,15 @@ def check_leds(check_list):
         if len(line) == 2:
             refer = line[1].strip()
         if 'psuX_led' in attr:
-            refer_psuX_led = refer 
+            refer_psuX_led = refer
             continue
         elif 'X' in attr:
             continue
 
         if 'psu' in attr and 'led' in attr:
             refer = refer_psuX_led
-        
-        file_path = os.path.join(dir_path, attr)
+
+        file_path = os.path.join(leds_path, attr)
         info = read_info(file_path)
         value = info[0]
         ret = check_value(attr, value, refer)
@@ -454,12 +465,13 @@ def check_watchdog(check_list):
     ret = check_path(check_list)
     if ret[1] != 0:
         return
-    dir_path = ret[0]
+    global watchdog_path
+    watchdog_path = ret[0]
 
     write_log('{0:<22}{1:<32}{2:<18}{3:<8}'.format('items', \
                 'value','reference', 'result'))
     attr = check_list[2].strip()
-    file_path = os.path.join(dir_path, attr)
+    file_path = os.path.join(watchdog_path, attr)
     info = read_info(file_path)
     value = info[0]
     ret = info[1]
@@ -473,10 +485,43 @@ def check_watchdog(check_list):
     write_log('')
     return
 
+#check psu fan pwm control
+def check_psu_fan_ctrl():
+
+    return
+
+#show some shell cat commend cost time
+def show_cost_time():
+    print 'calc cost time, please wait a moment......'
+    write_log('{0:^72}'.format('check cat attr run time'))
+    dir_path = []
+    attr = []
+    dir_path.append(os.path.join(psu_path, psu_no,'fan*_input'))
+    dir_path.append(os.path.join(Xsfp_path, Xsfp_port, 'temperature'))
+    dir_path.append(os.path.join(ctrl_path,'fan*_input'))
+    attr.append(psu_no + '/fan*_input')
+    attr.append(Xsfp_port + '/temperature')
+    attr.append('ctrl' + '/fan*_input')
+
+    for i in range(0,3):
+        print i
+        delta = 0
+        for n in range(0,5):
+            d1 = datetime.datetime.now()
+            os.system('cat ' + dir_path[i] + ' >/dev/null')
+            d2 = datetime.datetime.now()
+            delta += (d2 - d1).microseconds
+            time.sleep(4)
+        delta /= (10.0*1000000)   #get average run time and convert microsecond to second
+        print 'cat %s run time:%f s' %(attr[i], delta)
+        write_log('cat ' + attr[i] + ' run time:' + str(delta) + 's')
+    write_log('')
+    return
+
 #main function entry
 if __name__=="__main__":
     init_log()
     check_list = config_split()
     check_sysfs(check_list)
-
+    show_cost_time()
 
