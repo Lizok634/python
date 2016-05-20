@@ -504,7 +504,6 @@ def show_cost_time():
     attr.append('ctrl' + '/fan*_input')
 
     for i in range(0,3):
-        print i
         delta = 0
         for n in range(0,5):
             d1 = datetime.datetime.now()
