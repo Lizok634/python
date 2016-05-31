@@ -255,8 +255,7 @@ def check_mode(attr, refer_mode):
     elif attr.mode == '200':    #write only
         attr.mode = 'w'
     else:
-        print '%s mode is unknown' %attr.name
-        exit(-1)
+        attr.mode ='X'
     
     if attr.mode != refer_mode:
         if flag == ERRNO['EVALUE']:
