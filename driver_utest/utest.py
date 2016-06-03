@@ -23,21 +23,230 @@ import os.path
 import commands
 import datetime
 
+
+#err number
+ERRNO ={'EPATH':1, 'EEMPTY':2, 'EVALUE':3, 'EINVALID':4, 'EMODE':5, 'EVA&MO':6,
+        'EIN&MO':7, 'UNSUPPORT':8, 'EOTHER':20}
+
+
 #define attrbute class
 class Attr(object):
     def __init__(self):
         self.name = ''
         self.path = ''
         self.value = '0'
-        self.ref_vaule = '----'
+        self.ref_vaule = 'NULL'
         self.mode = 'r'
         self.ref_mode = 'r'
         self.flag = 0
 
+    def set_name(self, name):
+        self.name = name
 
-#err number
-ERRNO ={'EPATH':1, 'EEMPTY':2, 'EVALUE':3, 'EINVALID':4, 'EMODE':5, 'EVA&MO':6,
-        'EIN&MO':7, 'UNSUPPORT':8, 'EOTHER':20}
+    def set_path(self, path):
+        self.path = path
+
+    def set_value(self, value):
+        self.value = value
+
+    def set_refer_value(self, refer_value):
+        self.refer_value = refer_value
+
+    def set_mode(self, mode):
+        self.mode = mode
+
+    def set_refer_mode(self, refer_mode):
+        self.mode = mode
+
+    def set_flag(self, flag):
+        self.flag = flag
+
+    def get_name():
+        return self.name
+
+    def get_path():
+        return self.path
+
+    def get_value():
+        return self.value
+
+    def get_refer_value():
+        return self.refer_value
+
+    def get_mode():
+        return self.mode
+
+    def get_refer_mode():
+        return self.mode
+
+    def get_flag():
+        return self.flag
+
+    #get attr info
+    def get_info(self, file_path, refer_value, refer_mode):
+        self.path = file_path
+        self.name = os.path.basename(file_path)
+        self.refer_value = refer_value
+        self.refer_mode = refer_mode
+
+        if os.path.isfile(file_path):
+            self.mode = oct(os.stat(file_path).st_mode)[-3:]
+            if self.mode == '200':   #write only file
+                self.value = '----'
+                self.flag = 0
+                return
+        else:
+            self.flag = ERRNO['EPATH']
+            return
+
+        try:
+            f = open(file_path, 'r')
+            value = f.readline().splitlines()
+            f.close()
+            #if value have more than 1 element, here  will throw error
+            self.value = ''.join(value)
+            self.flag = 0
+            return
+        except IOError:
+            self.flag = ERRNO['EPATH']
+            return
+
+    #get value fast used to make judgement
+    def get_value_fast(self, file_path):
+        try:
+            f = open(file_path, 'r')
+            value = f.readline().splitlines()
+            f.close()
+            #if value have more than 1 element, here  will throw error
+            self.value = ''.join(value)
+            self.flag = 0
+            return
+        except IOError:
+            self.flag = ERRNO['EPATH']
+            return
+    
+    #check value
+    def check_value(self):
+        if self.flag != 0:
+            return
+
+        if len(self.value) <= 0:
+            self.flag = ERRNO['EEMPTY']
+            return
+
+        if self.mode == '200':
+            self.flag = 0
+            return
+
+        if self.value == 'invalid':
+            self.flag = ERRNO['UNSUPPORT']
+            return
+
+        refer_value = self.refer_value
+        if self.name == 'start_mode':   #start mode check
+            if self.value == 'cold start' or self.value == 'warm start':
+                self.flag = 0
+                return
+            else:
+                self.flag = ERRNO['EVALUE']
+                return
+        elif 'max' in refer_value and 'char' in refer_value:#self value is a string
+            refer_value = (re.findall(r'\d+',refer_value))#get the max string number
+            refer_value[0] = int(refer_value[0])
+
+            if len(self.value) <= refer_value[0]:
+                self.flag = 0
+                return
+            else:
+                self.flag = ERRNO['EVALUE']
+                return
+        elif '-' in refer_value:            #refer value is a range
+            value = ''                      #temp var avoid to change self.value
+            if '-' in self.value:           #judge for negative number
+                value = int(self.value)
+            elif self.value.isdigit():
+                value = int(self.value)
+            else:
+                self.flag = ERRNO['EEMPTY']
+                return
+            refer_value = re.findall(r'\d+',refer_value)
+            refer_value[0] = int(refer_value[0])
+            refer_value[1] = int(refer_value[1])
+            if 'temp' in self.name:
+                if value > -1*refer_value[0] and value <= refer_value[1]:
+                    self.flag = 0
+                    return
+                elif value == -128000:      #temp -12800 is a invalid number
+                    self.flag = ERRNO['EINVALID']
+                    return
+                else:
+                    self.flag = ERRNO['EVALUE']
+                    return
+            elif 'fault' in self.name:
+                if value == 0:
+                    self.flag = 0
+                    return
+                elif value == 1:        #XXX_fault = 1  represent device XXX is fault
+                    self.flag = ERRNO['EVALUE']
+                    return
+            else:
+                if value >= int(refer_value[0]) and value <= int(refer_value[1]):
+                    self.flag = 0
+                    return
+                else:
+                    self.flag = ERRNO['EVALUE']
+                    return
+        elif 'mac' in self.name:
+            mac = re.match(r'^([0-9a-fA-F]{2})(([/\s:][0-9a-fA-F]{2}){5})$', self.value)
+            if mac:
+                if mac.group() == self.value:
+                    self.flag = 0
+                    return
+                else:
+                    self.flag = ERRNO['EVALUE']
+                    return
+            else:
+                self.flag = ERRNO['EVALUE']
+                return
+
+        self.flag = ERRNO['EOTHER']
+        return
+
+    #check mode
+    def check_mode(self):
+        if self.flag == ERRNO['EPATH']:
+            return
+
+        if self.mode == '444':      #read only
+            self.mode = 'r'
+        elif self.mode == '644':    #read and write
+            self.mode = 'rw'
+        elif self.mode == '200':    #write only
+            self.mode = 'w'
+        else:
+            self.mode = 'E'
+
+        flag = self.flag
+        if self.flag == ERRNO['UNSUPPORT']:
+            self.flag = flag
+            return
+
+        if self.mode != self.refer_mode:
+            if flag == ERRNO['EVALUE']:
+                self.flag = ERRNO['EVA&MO']
+            elif flag == ERRNO['EINVALID']:
+                self.flag = ERRNO['EIN&MO']
+            else:
+                self.flag = ERRNO['EMODE']
+        else:
+            self.flag = flag
+
+        self.flag = flag
+        return
+
+
+
+
 
 #init log file
 def init_log():
@@ -48,12 +257,14 @@ def init_log():
         log = open(log_file, 'w')
         log.truncate()      #empty log file
         log.close()
-        tmp = os.popen('version')   #get box name
-        boxinfo = tmp.readlines();tmp.close()
-        box = boxinfo[2].split(':')[1].strip()
-        box = ''.join(['Box:', box])
-        version = boxinfo[3].split(':')[1].strip()  #get system version
-        version = ''.join(['version', ':', version])
+        ret = commands.getstatusoutput('version')
+        if ret[0] == 0:
+            tmp = os.popen('version')   #get box name
+            boxinfo = tmp.readlines();tmp.close()
+            box = boxinfo[2].split(':')[1].strip()
+            box = ''.join(['Box:', box])
+            version = boxinfo[3].split(':')[1].strip()  #get system version
+            version = ''.join(['version', ':', version])
 
         #ip = os.popen('ifconfig | grep 10.10.51.')  #get box ip address
         #addr = ip.read();ip.close();addr = addr.split(' ')
@@ -65,7 +276,10 @@ def init_log():
 
         time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         time = ''.join(['time:', time])   #get current time
-        info = ''.join(['# ', box, '  ', version, '\n# ', ip, '  ', time])
+        if ret[0] == 0:
+            info = ''.join(['# ', box, '  ', version, '\n# ', ip, '  ', time])
+        else:
+            info = ''.join(['#', ip, '  ', time])
         write_log(info)
         write_log('')
     except IOError:
@@ -116,12 +330,12 @@ def write_log(name, ret = -1, value = None, refer = '----', mode = 'r'):
                     value, refer, mode, '[EIN&MO]', '\n'))
             print '{0:<22}{1:<32}{2:<18}{3:^6}{4:<10}'.format(name, value,  \
                     refer, mode, '[EIN&MO]')
-        elif ret == 8:        #unsupport 
+        elif ret == 8:        #UNSUPPORTort
             log.write('{0:<22}{1:<32}{2:<18}{3:^6}{4:<10}{5}'.format(name,  \
                     value, refer, mode, '[UNSUPPORT]', '\n'))
             print '{0:<22}{1:<32}{2:<18}{3:^6}{4:<10}'.format(name, value,  \
                     refer, mode, '[UNSUPPORT]')
-        elif ret == 20:        #other error 
+        elif ret == 20:        #other error
             log.write('{0:<22}{1:<32}{2:<18}{3:^6}{4:<10}{5}'.format(name,  \
                     value, refer, mode, '[EOTHER]', '\n'))
             print '{0:<22}{1:<32}{2:<18}{3:^6}{4:<10}'.format(name, value,  \
@@ -172,7 +386,7 @@ def read_info(file_path):
     except IOError:
         attr.flag = ERRNO['EPATH']
         return attr
-    
+
     return attr
 
 #split config file
@@ -194,113 +408,20 @@ def config_split(config_file):
                 check_list.append(a)
     return  check_list
 
-#check value
-def check_value(attr, refer_value):
-    if attr.flag != 0:
-        return attr.flag
-
-    if len(attr.value) == 0:
-        return ERRNO['EEMPTY']
-
-    if attr.mode == '200':
-        return 0
-    
-    if attr.value == 'invalid':
-        return ERRNO['UNSUPPORT']
-            
-    if attr.name == 'start_mode':   #start mode check
-        if attr.value == 'cold start' or attr.value == 'warm start':
-            return 0
-        else:
-            return ERRNO['EVALUE']
-    elif 'max' in refer_value and 'char' in refer_value:#attr value is a string
-        refer_value = (re.findall(r'\d+',refer_value))#get the max string number
-        refer_value[0] = int(refer_value[0])
-        
-        if len(attr.value) <= refer_value[0]:
-            return 0
-        else:
-            return ERRNO['EVALUE']
-    elif '-' in refer_value:            #refer value is a range
-        value = ''                      #temp var avoid to change attr.value
-        if '-' in attr.value:           #judge for negative number
-            value = int(attr.value)
-        elif attr.value.isdigit():
-            value = int(attr.value)
-        else:
-            return ERRNO['EEMPTY']
-        refer_value = re.findall(r'\d+',refer_value)
-        refer_value[0] = int(refer_value[0])
-        refer_value[1] = int(refer_value[1])
-        if 'temp' in attr.name:
-            if value > -1*refer_value[0] and value <= refer_value[1]:
-                return 0
-            elif value == -128000:      #temp -12800 is a invalid number
-                return ERRNO['EINVALID']
-            else:
-                return ERRNO['EVALUE']
-        elif 'fault' in attr.name:
-            if value == 0:
-                return 0
-            elif value == 1:        #XXX_fault = 1  represent device XXX is fault
-                return ERRNO['EVALUE']
-        else:
-            if value >= int(refer_value[0]) and value <= int(refer_value[1]):
-                return 0
-            else:
-                return ERRNO['EVALUE']
-    elif 'mac' in attr.name:
-        mac = re.match(r'^([0-9a-fA-F]{2})(([/\s:][0-9a-fA-F]{2}){5})$', attr.value)
-        if mac:
-            if mac.group() == attr.value:
-                return 0
-            else:
-                return ERRNO['EVALUE']
-        else:
-            return ERRNO['EVALUE']
-
-    return ERRNO['EOTHER']
-
-#check mode
-def check_mode(attr, refer_mode):
-    if attr.flag == ERRNO['EPATH']:
-        return attr.flag
-
-    if attr.mode == '444':      #read only
-        attr.mode = 'r'
-    elif attr.mode == '644':    #read and write
-        attr.mode = 'rw'
-    elif attr.mode == '200':    #write only
-        attr.mode = 'w'
-    else:
-        attr.mode = 'E'
-  
-    flag = attr.flag
-    if attr.flag == ERRNO['UNSUPPORT']:
-        return flag
-
-    if attr.mode != refer_mode:
-        if flag == ERRNO['EVALUE']:
-            attr.flag = ERRNO['EVA&MO']
-        elif flag == ERRNO['EINVALID']:
-            attr.flag = ERRNO['EIN&MO']
-        else:
-            attr.flag = ERRNO['EMODE']
-    else:
-        attr.flag = flag
-
-    return attr.flag
-
 #check sysfs
 def check_sysfs(check_list):
     for sys_path in check_list:
         if 'hwinfo' in sys_path[0]:     #hwinfo
+            #pass
             check_hwinfo(sys_path)
         elif 'psu' in sys_path[0]:      #psu
+            #pass
             check_psu(sys_path)
         elif 'sfp/sfp+' in sys_path[0]: #sfp
+            #pass
             check_Xsfp(sys_path, '3')
         elif 'qsfp' in sys_path[0]:     #qsfp
+            #pass
             check_Xsfp(sys_path, '4')
         elif 'ctrl' in sys_path[0]:     #ctrl
             #pass
@@ -315,7 +436,6 @@ def check_sysfs(check_list):
 
 #check hwinfo
 def check_hwinfo(check_list):
-    attr = Attr()
     ret = check_path(check_list)
     if ret[1] != 0:
         return
@@ -324,17 +444,19 @@ def check_hwinfo(check_list):
     write_log('{0:<22}{1:<32}{2:<18}{3:<6}{4:<10}'.format('items',\
                 'value','reference', 'mode', 'result'))
     for line in check_list[2:]:
+        attr = Attr()
         arry = line.strip().split('|')
         name = arry[0].strip()
         refer_value = arry[1].strip()
         refer_mode = arry[2].strip()
 
         file_path = os.path.join(hwinfo_path, name)
-        attr = read_info(file_path)
-        attr.flag = check_value(attr, refer_value)
-        attr.falg = check_mode(attr, refer_mode)
-        write_log(attr.name, attr.flag, attr.value, refer_value, attr.mode)
-    
+        attr.get_info(file_path, refer_value, refer_mode)
+        attr.check_value()
+        attr.check_mode()
+        write_log(attr.name, attr.flag, attr.value, attr.refer_value, attr.mode)
+        del attr
+
     write_log('')
     return
 
@@ -347,7 +469,6 @@ def check_psu(check_list):
     psu_path = ret[0]
     global psu_no
 
-    attr = Attr()
     psu_num = os.listdir(psu_path)
     for psu in psu_num:
         X = psu.replace('psu', '')  #get psu num
@@ -368,8 +489,9 @@ def check_psu(check_list):
         refer_fanX_fault = ''
         refer_mode_pwm = ''
         refer_mode_default = 'r'
-        
+
         for line in tmp_list[2:]:
+            attr = Attr()
             arry = line.strip().split('|')
             name = arry[0].strip()
             if len(arry) >= 2:
@@ -404,20 +526,20 @@ def check_psu(check_list):
             elif 'fan' in name and 'fault' in name:
                 refer_value = refer_fanX_fault
                 refer_mode = refer_mode_default
-            
+
             file_path = os.path.join(psuX_path, name)
-            attr = read_info(file_path)
+            attr.get_info(file_path, refer_value, refer_mode)
             if 'present' in attr.name and attr.value == '0':
                 log = ''.join([psu, ' is not present'])
                 write_log(log)
                 break
             else:
-                attr.flag = check_value(attr, refer_value)
-                attr.falg = check_mode(attr, refer_mode)
-                write_log(attr.name, attr.flag, attr.value, refer_value, attr.mode)
+                attr.check_value()
+                attr.check_mode()
+                write_log(attr.name, attr.flag, attr.value, attr.refer_value, attr.mode)
                 if 'power_good' in attr.name and int(attr.value) == 1:
                     psu_no = psu
-    
+            del attr
     write_log('')
     return
 
@@ -430,11 +552,11 @@ def check_Xsfp(check_list, modu_type):
     Xsfp_path = ret[0]
     global Xsfp_port
 
-    attr = Attr()
     portX = os.listdir(Xsfp_path)
     for port in portX:
+        attr = Attr()
         file_path = os.path.join(Xsfp_path, port, 'identifier')#check ports type
-        attr = read_info(file_path)
+        attr.get_value_fast(file_path)
         modu_id = attr.value
         if modu_id != '3':  #only 3 represent for sfp, others default to qsfp
             modu_id = '4'
@@ -445,8 +567,8 @@ def check_Xsfp(check_list, modu_type):
             arry = line.strip().split('|')
             name = arry[0].strip()
             file_path = os.path.join(Xsfp_path, port, name)
-            
-            attr = read_info(file_path)
+
+            attr.get_value_fast(file_path)
             if attr.value == '0':  #check module plug in or out
                 #log = ''.join(['     module plug out     '])
                 #write_log(log)
@@ -465,13 +587,14 @@ def check_Xsfp(check_list, modu_type):
                         refer_value = arry[1].strip()
                         refer_mode = arry[2].strip()
                     file_path = os.path.join(Xsfp_path, port, name)
-                    attr = read_info(file_path)
-                    attr.flag = check_value(attr, refer_value)
-                    attr.falg = check_mode(attr, refer_mode)
-                    write_log(attr.name, attr.flag, attr.value, refer_value, attr.mode)
+                    attr.get_info(file_path, refer_value, refer_mode)
+                    attr.check_value()
+                    attr.check_mode()
+                    write_log(attr.name, attr.flag, attr.value, attr.refer_value, attr.mode)
         else:
             continue
-    
+        del attr
+
     write_log('')
     return
 
@@ -483,12 +606,13 @@ def check_ctrl(check_list):
     global ctrl_path
     ctrl_path = ret[0]
 
-    global fan_number 
+    global fan_number
     fan_number = 0
     global fanr_number
     fanr_number = 0
     write_log('{0:<22}{1:<32}{2:<18}{3:<6}{4:<10}'.format('items', \
                 'value','reference', 'mode', 'result'))
+    
     attr = Attr()
     arry = check_list[2].strip().split('|')    #get fan number
     name = arry[0].strip()
@@ -496,12 +620,12 @@ def check_ctrl(check_list):
         refer_value = arry[1].strip()
         refer_mode = arry[2].strip()
     file_path = os.path.join(ctrl_path, name)
-    attr = read_info(file_path)
+    attr.get_info(file_path, refer_value, refer_mode)
     if attr.value.isdigit() and int(attr.value) < 20:#fan number must be a digist
         fan_number = attr.value
-        attr.flag = check_value(attr, refer_value)
-        attr.falg = check_mode(attr, refer_mode)
-        write_log(attr.name, attr.flag, attr.value, refer_value, attr.mode)
+        attr.check_value()
+        attr.check_mode()
+        write_log(attr.name, attr.flag, attr.value, attr.refer_value, attr.mode)
     else:
         write_log('fan number error')
         return
@@ -512,50 +636,53 @@ def check_ctrl(check_list):
         refer_value = arry[1].strip()
         refer_mode = arry[2].strip()
     file_path = os.path.join(ctrl_path, name)
-    attr = read_info(file_path)
+    attr.get_info(file_path, refer_value, refer_mode)
     if attr.value.isdigit() and int(attr.value) < 20:#fanr number must be a digist
         fanr_number = attr.value
-        attr.flag = check_value(attr, refer_value)
-        attr.falg = check_mode(attr, refer_mode)
-        write_log(attr.name, attr.flag, attr.value, refer_value, attr.mode)
+        attr.check_value()
+        attr.check_mode()
+        write_log(attr.name, attr.flag, attr.value, attr.refer_value, attr.mode)
     else:
         write_log('fanr number error')
         return
-    
+    del attr
+
     for line in check_list[4:]:
+        attr = Attr()
         arry = line.strip().split('|')
         name = arry[0].strip()
         if len(line) >= 2:
             refer_value = arry[1].strip()
             refer_mode = arry[2].strip()
-        
+
         if 'fanX' in name or 'pwmX' in name:  #get fanX info
             n = 1
             while n <= int(fan_number):
                 attrX = name.replace('X',str(n))
                 file_path = os.path.join(ctrl_path, attrX)
-                attr = read_info(file_path)
-                attr.flag = check_value(attr, refer_value)
-                attr.falg = check_mode(attr, refer_mode)
-                write_log(attr.name, attr.flag, attr.value, refer_value, attr.mode)
+                attr.get_info(file_path, refer_value, refer_mode)
+                attr.check_value()
+                attr.check_mode()
+                write_log(attr.name, attr.flag, attr.value, attr.refer_value, attr.mode)
                 n += 1
         elif 'fanrX' in name:   #get fanrX info
             n = 1
             while n <= int(fanr_number):
                 attrX = name.replace('X',str(n))
                 file_path = os.path.join(ctrl_path, attrX)
-                attr = read_info(file_path)
-                attr.flag = check_value(attr, refer_value)
-                attr.falg = check_mode(attr, refer_mode)
-                write_log(attr.name, attr.flag, attr.value, refer_value, attr.mode)
+                attr.get_info(file_path, refer_value, refer_mode)
+                attr.check_value()
+                attr.check_mode()
+                write_log(attr.name, attr.flag, attr.value, attr.refer_value, attr.mode)
                 n += 1
         else:
             file_path = os.path.join(ctrl_path, name)
-            attr = read_info(file_path)
-            attr.flag = check_value(attr, refer_value)
-            attr.falg = check_mode(attr, refer_mode)
-            write_log(attr.name, attr.flag, attr.value, refer_value, attr.mode)
-    
+            attr.get_info(file_path, refer_value, refer_mode)
+            attr.check_value()
+            attr.check_mode()
+            write_log(attr.name, attr.flag, attr.value, attr.refer_value, attr.mode)
+        del attr
+
     write_log('')
     return
 
@@ -575,9 +702,9 @@ def check_leds(check_list):
     check_list.extend(attrX)
     refer_psuX_led = ''
     refer_psuX_mode = ''
-    
-    attr = Attr()
+
     for line in check_list[2:]:
+        attr = Attr()
         arry = line.strip().split('|')
         name = arry[0].strip()
         if len(arry) >= 2:
@@ -595,12 +722,13 @@ def check_leds(check_list):
             refer_mode = refer_psuX_mode
 
         file_path = os.path.join(leds_path, name)
-        attr = read_info(file_path)
-        attr.name = name
-        attr.flag = check_value(attr, refer_value)
-        attr.falg = check_mode(attr, refer_mode)
-        write_log(attr.name, attr.flag, attr.value, refer_value, attr.mode)
-    
+        attr.get_info(file_path, refer_value, refer_mode)
+        attr.set_name(name)
+        attr.check_value()
+        attr.check_mode()
+        write_log(attr.name, attr.flag, attr.value, attr.refer_value, attr.mode)
+        del attr
+
     write_log('')
     return
 
@@ -614,20 +742,20 @@ def check_watchdog(check_list):
 
     write_log('{0:<22}{1:<32}{2:<18}{3:<6}{4:<10}'.format('items', \
                 'value','reference', 'mode', 'result'))
-    attr = Attr()
+    
     for line in check_list[2:]:
+        attr = Attr()
         arry = line.strip().split('|')
         name = arry[0].strip()
         if len(arry) >= 2:
             refer_value = arry[1].strip()
             refer_mode = arry[2].strip()
-        #if name == 'keep_alive':
-        #    continue
         file_path = os.path.join(watchdog_path, name)
-        attr = read_info(file_path)
-        attr.flag = check_value(attr, refer_value)
-        attr.falg = check_mode(attr, refer_mode)
-        write_log(attr.name, attr.flag, attr.value, refer_value, attr.mode)
+        attr.get_info(file_path, refer_value, refer_mode)
+        attr.check_value()
+        attr.check_mode()
+        write_log(attr.name, attr.flag, attr.value, attr.refer_value, attr.mode)
+        del attr
 
     write_log('')
     return
@@ -635,7 +763,7 @@ def check_watchdog(check_list):
 #input tips
 def check_input():
     key = raw_input('input yes or no:')
-    
+
     while key != 'yes' and key != 'no':
         key = raw_input('input yes or no:')
 
@@ -648,7 +776,7 @@ def check_input():
 def check_fan_ctrl():
     if int(fan_number) <= 1:
         return
-    
+
     print '\n*****************************************'
     write_log('{0:^80}'.format('check fan pwm set'))
     i = random.randint(1,int(fan_number))
@@ -686,7 +814,7 @@ def check_fan_ctrl():
     time.sleep(2)
     write_log('{0}{1}{2:<5}{3}{4}{5:<8}{6}{7}{8:<2}'.format(pwmX, ':',\
             pwm_value, fanX_input, ':', input_value, fanX_fault, ':', fault_value))
-    
+
 
     raw_input('press any key to continue..')
     print ''
@@ -733,7 +861,7 @@ def check_rtc():
     os.system('date')
     print 'rtc time:'
     os.system('hwclock -r')
-  
+
     print 'do you want test rtc?'
     ret = check_input()
     if ret:
@@ -749,7 +877,7 @@ def check_rtc():
     print '*****************************************'
     raw_input('press any key to continue..')
     print ''
-    
+
     return
 
 
@@ -788,7 +916,7 @@ def test_watchdog():
         #ret = commands.getstatusoutput('cat ' + watchdog_path  +'/time_left')
         #write_log(ret[1])
         time.sleep(1)
-    time.sleep(5)   #watchdog will wait a moment to reboot 
+    time.sleep(5)   #watchdog will wait a moment to reboot
     #write_log('watchdog reboot failed')
     print 'watchdog reboot failed'
 
@@ -804,7 +932,7 @@ if __name__=="__main__":
     init_log()
     check_list = config_split(sys.argv[1])
     check_sysfs(check_list)
-    check_fan_ctrl()
-    show_cost_time()
-    check_rtc()
-    test_watchdog()
+    #check_fan_ctrl()
+    #show_cost_time()
+    #check_rtc()
+    #test_watchdog()
