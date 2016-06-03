@@ -18,7 +18,9 @@ import re
 import sys
 import copy
 import time
+import random
 import os.path
+import commands
 import datetime
 
 #define attrbute class
@@ -34,8 +36,8 @@ class Attr(object):
 
 
 #err number
-ERRNO ={'EPATH':1, 'EEMPTY':2, 'EVALUE':3, 'EINVALID':4, 'EMODE':5, 'EVA&MO':6,\
-        'EIN&MO':7, 'EOTHER':20}
+ERRNO ={'EPATH':1, 'EEMPTY':2, 'EVALUE':3, 'EINVALID':4, 'EMODE':5, 'EVA&MO':6,
+        'EIN&MO':7, 'UNSUPPORT':8, 'EOTHER':20}
 
 #init log file
 def init_log():
@@ -45,6 +47,7 @@ def init_log():
     try:
         log = open(log_file, 'w')
         log.truncate()      #empty log file
+        log.close()
         tmp = os.popen('version')   #get box name
         boxinfo = tmp.readlines();tmp.close()
         box = boxinfo[2].split(':')[1].strip()
@@ -79,48 +82,54 @@ def write_log(name, ret = -1, value = None, refer = '----', mode = 'r'):
                     value, refer, mode, '[pass]', '\n'))
             print '{0:<22}{1:<32}{2:<18}{3:^6}{4:<10}'.format(name, value,  \
                     refer, mode, '[pass]')
-        if ret == 1:        #sysfs path or file is not exist
+        elif ret == 1:        #sysfs path or file is not exist
             log.write('{0:<22}{1:<56}{2}'.format(name, 'is not exist',      \
                     '[EPATH]\n'))
             print '{0:<22}{1:<56}{2}'.format(name, 'is not exist', '[EPATH]')
-        if ret == 2:        #open file fail, an empty file
+        elif ret == 2:        #open file fail, an empty file
             log.write('{0:<22}{1:<32}{2:<18}{3:^6}{4:<10}{5}'.format(name,  \
                     '----', refer, mode, '[EEMPTY]', '\n'))
             print '{0:<22}{1:<32}{2:<18}{3:^6}{4:<10}'.format(name, '----', \
                     refer, mode, '[EEMPTY]')
-        if ret == 3:        #error value
+        elif ret == 3:        #error value
             log.write('{0:<22}{1:<32}{2:<18}{3:^6}{4:<10}{5}'.format(name,  \
                     value, refer, mode, '[EVALUE]', '\n'))
             print '{0:<22}{1:<32}{2:<18}{3:^6}{4:<10}'.format(name, value,  \
                     refer, mode, '[EVALUE]')
-        if ret == 4:        #error invalid value
+        elif ret == 4:        #error invalid value
             log.write('{0:<22}{1:<32}{2:<18}{3:^6}{4:<10}{5}'.format(name,  \
                     value, refer, mode, '[EINVALID]', '\n'))
             print '{0:<22}{1:<32}{2:<18}{3:^6}{4:<10}'.format(name, value,  \
                     refer, mode, '[EINVALID]')
-        if ret == 5:        #error mode
+        elif ret == 5:        #error mode
             log.write('{0:<22}{1:<32}{2:<18}{3:^6}{4:<10}{5}'.format(name,  \
                     value, refer, mode, '[EMODE]', '\n'))
             print '{0:<22}{1:<32}{2:<18}{3:^6}{4:<10}'.format(name, value,  \
                     refer, mode, '[EMODE]')
-        if ret == 6:        #error value and mode
+        elif ret == 6:        #error value and mode
             log.write('{0:<22}{1:<32}{2:<18}{3:^6}{4:<10}{5}'.format(name,  \
                     value, refer, mode, '[EVA&MO]', '\n'))
             print '{0:<22}{1:<32}{2:<18}{3:^6}{4:<10}'.format(name, value,  \
                     refer, mode, '[EVA&MO]')
-        if ret == 7:        #error invalid value and mode
+        elif ret == 7:        #error invalid value and mode
             log.write('{0:<22}{1:<32}{2:<18}{3:^6}{4:<10}{5}'.format(name,  \
                     value, refer, mode, '[EIN&MO]', '\n'))
             print '{0:<22}{1:<32}{2:<18}{3:^6}{4:<10}'.format(name, value,  \
                     refer, mode, '[EIN&MO]')
-        if ret == 20:        #other error 
+        elif ret == 8:        #unsupport 
+            log.write('{0:<22}{1:<32}{2:<18}{3:^6}{4:<10}{5}'.format(name,  \
+                    value, refer, mode, '[UNSUPPORT]', '\n'))
+            print '{0:<22}{1:<32}{2:<18}{3:^6}{4:<10}'.format(name, value,  \
+                    refer, mode, '[UNSUPPORT]')
+        elif ret == 20:        #other error 
             log.write('{0:<22}{1:<32}{2:<18}{3:^6}{4:<10}{5}'.format(name,  \
                     value, refer, mode, '[EOTHER]', '\n'))
             print '{0:<22}{1:<32}{2:<18}{3:^6}{4:<10}'.format(name, value,  \
                     refer, mode, '[EOTHER]')
-        if ret == -1:       #print log without prefix
-            log.write(str(name) + '\n')
+        elif ret == -1:       #print log without prefix
+            log.write(name + '\n')
             print name
+        log.close()
     except IOError:
         print "open log file fail"
         os._exit(-1)
@@ -195,15 +204,26 @@ def check_value(attr, refer_value):
 
     if attr.mode == '200':
         return 0
-
-    if 'max' in refer_value and 'char' in refer_value:#attr value is a string
+    
+    if attr.value == 'invalid':
+        return ERRNO['UNSUPPORT']
+            
+    if attr.name == 'start_mode':   #start mode check
+        if attr.value == 'cold start' or attr.value == 'warm start':
+            return 0
+        else:
+            return ERRNO['EVALUE']
+    elif 'max' in refer_value and 'char' in refer_value:#attr value is a string
         refer_value = (re.findall(r'\d+',refer_value))#get the max string number
         refer_value[0] = int(refer_value[0])
+        
         if len(attr.value) <= refer_value[0]:
             return 0
-    elif '-' in refer_value:    #refer value is a range
-        value = ''  #temp var avoid to change attr.value
-        if '-' in attr.value:    #judge for negative number
+        else:
+            return ERRNO['EVALUE']
+    elif '-' in refer_value:            #refer value is a range
+        value = ''                      #temp var avoid to change attr.value
+        if '-' in attr.value:           #judge for negative number
             value = int(attr.value)
         elif attr.value.isdigit():
             value = int(attr.value)
@@ -215,14 +235,14 @@ def check_value(attr, refer_value):
         if 'temp' in attr.name:
             if value > -1*refer_value[0] and value <= refer_value[1]:
                 return 0
-            elif value == -128000:  #temp -12800 is a invalid number
+            elif value == -128000:      #temp -12800 is a invalid number
                 return ERRNO['EINVALID']
             else:
                 return ERRNO['EVALUE']
         elif 'fault' in attr.name:
             if value == 0:
                 return 0
-            elif value == 1:    #XXX_fault = 1  represent device XXX is fault
+            elif value == 1:        #XXX_fault = 1  represent device XXX is fault
                 return ERRNO['EVALUE']
         else:
             if value >= int(refer_value[0]) and value <= int(refer_value[1]):
@@ -246,8 +266,6 @@ def check_mode(attr, refer_mode):
     if attr.flag == ERRNO['EPATH']:
         return attr.flag
 
-    flag = attr.flag
-
     if attr.mode == '444':      #read only
         attr.mode = 'r'
     elif attr.mode == '644':    #read and write
@@ -255,8 +273,12 @@ def check_mode(attr, refer_mode):
     elif attr.mode == '200':    #write only
         attr.mode = 'w'
     else:
-        attr.mode ='X'
-    
+        attr.mode = 'E'
+  
+    flag = attr.flag
+    if attr.flag == ERRNO['UNSUPPORT']:
+        return flag
+
     if attr.mode != refer_mode:
         if flag == ERRNO['EVALUE']:
             attr.flag = ERRNO['EVA&MO']
@@ -342,7 +364,7 @@ def check_psu(check_list):
 
         refer_tempX_input = ''
         refer_fanX_input = ''
-        refer_fanX_pwm = ''
+        refer_pwmX = ''
         refer_fanX_fault = ''
         refer_mode_pwm = ''
         refer_mode_default = 'r'
@@ -360,8 +382,8 @@ def check_psu(check_list):
             elif 'fanX_input' in name:
                 refer_fanX_input = refer_value
                 continue
-            elif 'fanX_pwm' in name:
-                refer_fanX_pwm = refer_value
+            elif 'pwmX' in name:
+                refer_pwmX = refer_value
                 refer_mode_pwm = refer_mode
                 continue
             elif 'fanX_fault' in name:
@@ -376,8 +398,8 @@ def check_psu(check_list):
             elif 'fan' in name and 'input' in name:
                 refer_value = refer_fanX_input
                 refer_mode = refer_mode_default
-            elif 'fan' in name and 'pwm' in name:
-                refer_value = refer_fanX_pwm
+            elif 'pwmX' in name:
+                refer_value = refer_pwmX
                 refer_mode = refer_mode_pwm
             elif 'fan' in name and 'fault' in name:
                 refer_value = refer_fanX_fault
@@ -461,7 +483,9 @@ def check_ctrl(check_list):
     global ctrl_path
     ctrl_path = ret[0]
 
+    global fan_number 
     fan_number = 0
+    global fanr_number
     fanr_number = 0
     write_log('{0:<22}{1:<32}{2:<18}{3:<6}{4:<10}'.format('items', \
                 'value','reference', 'mode', 'result'))
@@ -505,7 +529,7 @@ def check_ctrl(check_list):
             refer_value = arry[1].strip()
             refer_mode = arry[2].strip()
         
-        if 'fanX' in name:  #get fanX info
+        if 'fanX' in name or 'pwmX' in name:  #get fanX info
             n = 1
             while n <= int(fan_number):
                 attrX = name.replace('X',str(n))
@@ -608,11 +632,6 @@ def check_watchdog(check_list):
     write_log('')
     return
 
-#check psu fan pwm control
-def check_psu_fan_ctrl():
-
-    return
-
 #input tips
 def check_input():
     key = raw_input('input yes or no:')
@@ -625,9 +644,59 @@ def check_input():
     else:
         return 0
 
+#check psu fan pwm control
+def check_fan_ctrl():
+    if int(fan_number) <= 1:
+        return
+    
+    print '\n*****************************************'
+    write_log('{0:^80}'.format('check fan pwm set'))
+    i = random.randint(1,int(fan_number))
+    pwmX = 'pwmX'.replace('X', str(i))
+    fanX_input = 'fanX_input'.replace('X', str(i))
+    fanX_fault = 'fanX_fault'.replace('X', str(i))
+    pwm_value = read_info(ctrl_path + '/'  + pwmX).value
+    input_value = read_info(ctrl_path + '/' + fanX_input).value
+    fault_value = read_info(ctrl_path + '/' + fanX_fault).value
+    write_log('{0}{1}{2:<5}{3}{4}{5:<8}{6}{7}{8:<2}'.format(pwmX, ':',\
+            pwm_value, fanX_input, ':', input_value, fanX_fault, ':', fault_value))
+    write_log('pwm set test')
+    os.system('echo 0 > '+ ctrl_path + '/' + pwmX)
+    write_log('set pwm 0')
+    time.sleep(2)
+    write_log('{0}{1}{2:<5}{3}{4}{5:<8}{6}{7}{8:<2}'.format(pwmX, ':',\
+            pwm_value, fanX_input, ':', input_value, fanX_fault, ':', fault_value))
+    os.system('echo 50 > '+ ctrl_path + '/' + pwmX)
+    write_log('set pwm 50')
+    time.sleep(2)
+    write_log('{0}{1}{2:<5}{3}{4}{5:<8}{6}{7}{8:<2}'.format(pwmX, ':',\
+            pwm_value, fanX_input, ':', input_value, fanX_fault, ':', fault_value))
+    os.system('echo 100 > '+ ctrl_path + '/' + pwmX)
+    write_log('set pwm 100')
+    time.sleep(2)
+    write_log('{0}{1}{2:<5}{3}{4}{5:<8}{6}{7}{8:<2}'.format(pwmX, ':',\
+            pwm_value, fanX_input, ':', input_value, fanX_fault, ':', fault_value))
+    os.system('echo 150 > '+ ctrl_path + '/' + pwmX)
+    write_log('set pwm 150')
+    time.sleep(2)
+    write_log('{0}{1}{2:<5}{3}{4}{5:<8}{6}{7}{8:<2}'.format(pwmX, ':',\
+            pwm_value, fanX_input, ':', input_value, fanX_fault, ':', fault_value))
+    os.system('echo 255 > '+ ctrl_path + '/' + pwmX)
+    write_log('set pwm 255')
+    time.sleep(2)
+    write_log('{0}{1}{2:<5}{3}{4}{5:<8}{6}{7}{8:<2}'.format(pwmX, ':',\
+            pwm_value, fanX_input, ':', input_value, fanX_fault, ':', fault_value))
+    
+
+    raw_input('press any key to continue..')
+    print ''
+
+    return
+
 #show some shell cat commend cost time
 def show_cost_time():
-    print '\ndo you want test mutiple read data'
+    print '\n*****************************************'
+    print 'do you want test mutiple read data'
     ret = check_input()
     if ret:
         return
@@ -658,7 +727,8 @@ def show_cost_time():
 
 #check rtc
 def check_rtc():
-    print '\nrtc check....'
+    print '\n*****************************************'
+    print 'rtc check....'
     print 'system time:'
     os.system('date')
     print 'rtc time:'
@@ -685,35 +755,42 @@ def check_rtc():
 
 #test watchdog work normal or not
 def test_watchdog():
-    print '\ndo you want test watdog, it will reboot machine.'
+    print '\n*****************************************'
+    print 'do you want test watdog, it will reboot machine.'
     ret = check_input()
     if ret:
         return
 
-    write_log('{0:^80}'.format('watchdog test'))
+    #write_log('{0:^80}'.format('watchdog test'))
+    print '{0:^80}'.format('watchdog test')
     print 'enable watchdog'
     os.system('echo 10 > ' + watchdog_path  +'/timeout')
     os.system('echo 1 > ' + watchdog_path  +'/wdt_enable')
-    for i in range(0,10)[::-1]:
+    for i in range(0,10):
         os.system('cat ' + watchdog_path  +'/time_left')
-        #write_log(i)
+        #ret = commands.getstatusoutput('cat ' + watchdog_path  +'/time_left')
+        #write_log(ret[1])
         time.sleep(1)
-    write_log('feed the dog')
+    #write_log('feed the dog')
+    print 'feed the dog'
     os.system('echo 1 > ' + watchdog_path  +'/keep_alive')
     time.sleep(5)
-    write_log('feed the dog success')
+    #write_log('feed the dog success')
+    print 'feed the dog success'
 
     os.system('echo 0 > ' + watchdog_path  +'/wdt_enable')
+    #write_log('test watchdog reboot')
+    print 'test watchdog reboot'
     os.system('echo 10 > ' + watchdog_path  +'/timeout')
     os.system('echo 1 > ' + watchdog_path  +'/wdt_enable')
-    
-    write_log('test watchdog reboot')
-    for i in range(0,10)[::-1]:
+    for i in range(0,10):
         os.system('cat ' + watchdog_path  +'/time_left')
-        #write_log(i)
+        #ret = commands.getstatusoutput('cat ' + watchdog_path  +'/time_left')
+        #write_log(ret[1])
         time.sleep(1)
-    time.sleep(3)   #watchdog will wait a moment to reboot 
-    write_log('watchdog reboot failed')
+    time.sleep(5)   #watchdog will wait a moment to reboot 
+    #write_log('watchdog reboot failed')
+    print 'watchdog reboot failed'
 
     return
 
@@ -727,6 +804,7 @@ if __name__=="__main__":
     init_log()
     check_list = config_split(sys.argv[1])
     check_sysfs(check_list)
+    check_fan_ctrl()
     show_cost_time()
     check_rtc()
     test_watchdog()
