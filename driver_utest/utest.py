@@ -245,9 +245,6 @@ class Attr(object):
         return
 
 
-
-
-
 #init log file
 def init_log():
     global log_file
@@ -786,6 +783,7 @@ def check_fan_ctrl():
     pwm_value = read_info(ctrl_path + '/'  + pwmX).value
     input_value = read_info(ctrl_path + '/' + fanX_input).value
     fault_value = read_info(ctrl_path + '/' + fanX_fault).value
+
     write_log('{0}{1}{2:<5}{3}{4}{5:<8}{6}{7}{8:<2}'.format(pwmX, ':',\
             pwm_value, fanX_input, ':', input_value, fanX_fault, ':', fault_value))
     write_log('pwm set test')
@@ -814,7 +812,6 @@ def check_fan_ctrl():
     time.sleep(2)
     write_log('{0}{1}{2:<5}{3}{4}{5:<8}{6}{7}{8:<2}'.format(pwmX, ':',\
             pwm_value, fanX_input, ':', input_value, fanX_fault, ':', fault_value))
-
 
     raw_input('press any key to continue..')
     print ''
@@ -853,6 +850,38 @@ def show_cost_time():
     write_log('')
     return
 
+#ckeck kernel .config
+def check_kernel_config(config_file):
+    write_log('{0:^80}'.format('check kernel config'))
+    if os.path.isfile('/proc/config.gz'): 
+        ret = commands.getstatusoutput('zcat /proc/config.gz')
+        if ret[0] != 0:
+            write_log(ret[1])
+            return
+        kernel_config = [x for x in ret[1].split('\n') if '#' not in x]
+       
+        with open(config_file, 'r') as f:
+            check_config_list = f.readlines()
+            count = 0
+            for x in check_config_list:
+                x = x.strip()
+                i = 0
+                for y in kernel_config:
+                    if x in y:
+                        i = 1
+                        break
+                if i == 0:
+                    count += 1
+                    write_log('{0}{1}'.format(x, ' is not set'))
+            if count == 0
+                write_log('check kernel config  [pass]')
+    else:
+        write_log('/proc/config.gz is not exist')
+        write_log('please set CONFIG_IKCONFIG=y and CONFIG_IKCONFIG_PROC=y ')
+
+    write_log('')
+    return
+
 #check rtc
 def check_rtc():
     print '\n*****************************************'
@@ -872,9 +901,12 @@ def check_rtc():
     os.system('hwclock -w')
     print 'rtc time:'
     os.system('hwclock -r')
-    print '*****************************************'
-    print '**please check system time after reboot**'
-    print '*****************************************'
+    os.system('hwclock -s')
+    print 'system time:'
+    os.system('date')
+    #print '*****************************************'
+    #print '**please check system time after reboot**'
+    #print '*****************************************'
     raw_input('press any key to continue..')
     print ''
 
@@ -933,6 +965,7 @@ if __name__=="__main__":
     check_list = config_split(sys.argv[1])
     check_sysfs(check_list)
     #check_fan_ctrl()
+    check_kernel_config('check_kernel.config')
     #show_cost_time()
     #check_rtc()
     #test_watchdog()
