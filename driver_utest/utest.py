@@ -9,7 +9,7 @@
 
 '''
 This is a driver unit test script
-To test watchdog, please run in super user mode
+Please run in super user mode
 Using example: python utest.py as5712.config
 '''
 
@@ -103,7 +103,7 @@ class Attr(object):
             f = open(file_path, 'r')
             value = f.readline().splitlines()
             f.close()
-            #if value have more than 1 element, here  will throw error
+            #if file have more than 2 lines, here  will throw error
             self.value = ''.join(value)
             self.flag = 0
             return
@@ -111,13 +111,13 @@ class Attr(object):
             self.flag = ERRNO['EPATH']
             return
 
-    #get value fast used to make judgement
+    #get value fast to make judgement
     def get_value_fast(self, file_path):
         try:
             f = open(file_path, 'r')
             value = f.readline().splitlines()
             f.close()
-            #if value have more than 1 element, here  will throw error
+            #if file have more than 2 lines, here  will throw error
             self.value = ''.join(value)
             self.flag = 0
             return
@@ -268,8 +268,9 @@ def init_log():
         #ip = ''.join([x for x in addr if 'addr' in x])
         tmp = os.popen('ifconfig')  #get box ip address
         ip = tmp.read();tmp.close()
-        ip = re.findall(r'addr:10.10.51.\w{1,3}', ip)
-        ip = ''.join(ip)
+        ip = re.search(r'addr:((?:(?:25[0-5]|2[0-4]\d|((1\d{2})|([1-9]?\d)))\.){3}(?:25[0-5]|2[0-4]\d|((1\d{2})|([1-9]?\d))))', ip)
+        if ip:
+            ip = ''.join(ip.group())
 
         time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         time = ''.join(['time:', time])   #get current time
@@ -873,7 +874,7 @@ def check_kernel_config(config_file):
                 if i == 0:
                     count += 1
                     write_log('{0}{1}'.format(x, ' is not set'))
-            if count == 0
+            if count == 0:
                 write_log('check kernel config  [pass]')
     else:
         write_log('/proc/config.gz is not exist')
@@ -916,7 +917,7 @@ def check_rtc():
 #test watchdog work normal or not
 def test_watchdog():
     print '\n*****************************************'
-    print 'do you want test watdog, it will reboot machine.'
+    print 'do you want test watchdog, it will reboot machine.'
     ret = check_input()
     if ret:
         return
@@ -965,7 +966,7 @@ if __name__=="__main__":
     check_list = config_split(sys.argv[1])
     check_sysfs(check_list)
     #check_fan_ctrl()
-    check_kernel_config('check_kernel.config')
-    #show_cost_time()
-    #check_rtc()
-    #test_watchdog()
+    #check_kernel_config('check_kernel.config')
+    show_cost_time()
+    check_rtc()
+    test_watchdog()
