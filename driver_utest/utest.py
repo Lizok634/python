@@ -328,7 +328,7 @@ def write_log(name, ret = -1, value = None, refer = '----', mode = 'r'):
                     value, refer, mode, '[EIN&MO]', '\n'))
             print '{0:<22}{1:<32}{2:<18}{3:^6}{4:<10}'.format(name, value,  \
                     refer, mode, '[EIN&MO]')
-        elif ret == 8:        #UNSUPPORTort
+        elif ret == 8:        #UNSUPPORT
             log.write('{0:<22}{1:<32}{2:<18}{3:^6}{4:<10}{5}'.format(name,  \
                     value, refer, mode, '[UNSUPPORT]', '\n'))
             print '{0:<22}{1:<32}{2:<18}{3:^6}{4:<10}'.format(name, value,  \
@@ -922,36 +922,36 @@ def test_watchdog():
     if ret:
         return
 
-    #write_log('{0:^80}'.format('watchdog test'))
-    print '{0:^80}'.format('watchdog test')
+    write_log('{0:^80}'.format('watchdog test'))
+    #print '{0:^80}'.format('watchdog test')
     print 'enable watchdog'
     os.system('echo 10 > ' + watchdog_path  +'/timeout')
     os.system('echo 1 > ' + watchdog_path  +'/wdt_enable')
-    for i in range(0,10):
-        os.system('cat ' + watchdog_path  +'/time_left')
-        #ret = commands.getstatusoutput('cat ' + watchdog_path  +'/time_left')
-        #write_log(ret[1])
+    for i in range(0,9):
+        #os.system('cat ' + watchdog_path  +'/time_left')
+        ret = commands.getstatusoutput('cat ' + watchdog_path  +'/time_left')
+        write_log(ret[1])
         time.sleep(1)
-    #write_log('feed the dog')
-    print 'feed the dog'
+    write_log('feed the dog')
+    #print 'feed the dog'
     os.system('echo 1 > ' + watchdog_path  +'/keep_alive')
     time.sleep(5)
-    #write_log('feed the dog success')
-    print 'feed the dog success'
+    write_log('feed the dog success')
+    #print 'feed the dog success'
 
     os.system('echo 0 > ' + watchdog_path  +'/wdt_enable')
-    #write_log('test watchdog reboot')
-    print 'test watchdog reboot'
+    write_log('test watchdog reboot')
+    #print 'test watchdog reboot'
     os.system('echo 10 > ' + watchdog_path  +'/timeout')
     os.system('echo 1 > ' + watchdog_path  +'/wdt_enable')
     for i in range(0,10):
-        os.system('cat ' + watchdog_path  +'/time_left')
-        #ret = commands.getstatusoutput('cat ' + watchdog_path  +'/time_left')
-        #write_log(ret[1])
+        #os.system('cat ' + watchdog_path  +'/time_left')
+        ret = commands.getstatusoutput('cat ' + watchdog_path  +'/time_left')
+        write_log(ret[1])
         time.sleep(1)
     time.sleep(5)   #watchdog will wait a moment to reboot
-    #write_log('watchdog reboot failed')
-    print 'watchdog reboot failed'
+    write_log('watchdog reboot failed')
+    #print 'watchdog reboot failed'
 
     return
 
@@ -960,13 +960,13 @@ if __name__=="__main__":
     if len(sys.argv) <= 1:
         print '****** ERR:please input config file name *****'
         print 'Under super user mode'
-        print 'Example: python utest.py as5712.config'
+        print 'Example: python utest.py as5712.config check_config-x86.config'
         exit(-1)
     init_log()
     check_list = config_split(sys.argv[1])
     check_sysfs(check_list)
     #check_fan_ctrl()
-    #check_kernel_config('check_kernel.config')
+    #check_kernel_config(sys.argv[2])
     show_cost_time()
     check_rtc()
     test_watchdog()
