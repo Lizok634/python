@@ -897,7 +897,7 @@ def check_rtc():
     if ret:
         return
 
-    key = raw_input('please input real time(format:"20160525 10:01"):')
+    key = raw_input('please input real time(format:"20160525 10:01:00"):')
     os.system('date -s ' + key)
     os.system('hwclock -w')
     print 'rtc time:'
